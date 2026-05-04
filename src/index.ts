@@ -1,0 +1,6 @@
+export { defineConfig } from './config/schema.js'
+export { loadConfig } from './config/loader.js'
+export { isAgentCommit } from './core/detector.js'
+export { getProtectedPaths, getStagedFiles } from './core/resolver.js'
+export { validate } from './core/validator.js'
+export type { Config, ValidationResult, Violation } from './core/validator.js'
