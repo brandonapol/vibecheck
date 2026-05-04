@@ -1,0 +1,60 @@
+{
+  "name": "agent-tdd",
+  "version": "0.1.0",
+  "description": "Pre-commit hooks that enforce test-first discipline on AI coding agents",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "agent-tdd": "./dist/bin/agent-tdd.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "ai-agents",
+    "tdd",
+    "pre-commit",
+    "claude-code",
+    "git-hooks",
+    "testing",
+    "devtools"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "husky": ">=8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "husky": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "chalk": "^5.0.0",
+    "execa": "^8.0.0",
+    "micromatch": "^4.0.0",
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/micromatch": "^4.0.0",
+    "@types/node": "^25.6.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}
