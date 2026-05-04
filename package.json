@@ -1,5 +1,5 @@
 {
-  "name": "agent-tdd",
+  "name": "vibecheck-tdd",
   "version": "0.1.0",
   "description": "Pre-commit hooks that enforce test-first discipline on AI coding agents",
   "type": "module",
@@ -14,7 +14,7 @@
     }
   },
   "bin": {
-    "agent-tdd": "./dist/bin/agent-tdd.js"
+    "vibecheck-tdd": "dist/bin/agent-tdd.js"
   },
   "files": [
     "dist",
@@ -37,6 +37,15 @@
     "devtools"
   ],
   "license": "MIT",
+  "author": "Brandon Apol",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brandonapol/vibecheck.git"
+  },
+  "homepage": "https://github.com/brandonapol/vibecheck#readme",
+  "bugs": {
+    "url": "https://github.com/brandonapol/vibecheck/issues"
+  },
   "peerDependencies": {
     "husky": ">=8.0.0"
   },
