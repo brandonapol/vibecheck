@@ -14,7 +14,7 @@
     }
   },
   "bin": {
-    "vibecheck-tdd": "dist/bin/agent-tdd.js"
+    "vibecheck": "dist/bin/vibecheck.js"
   },
   "files": [
     "dist",
