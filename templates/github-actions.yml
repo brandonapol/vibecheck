@@ -1,0 +1,43 @@
+name: Vibecheck Test Integrity
+
+on:
+  workflow_call:
+    inputs:
+      protected-branch:
+        description: 'Branch to compare against for semantic diff'
+        required: false
+        type: string
+        default: 'main'
+      mutation-threshold:
+        description: 'Minimum mutation score (0-100)'
+        required: false
+        type: number
+        default: 80
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '20'
+    secrets:
+      hidden-tests-deploy-key:
+        description: 'SSH deploy key for hidden tests repo (optional)'
+        required: false
+
+jobs:
+  vibecheck:
+    name: Test Integrity Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run vibecheck
+        run: npx vibecheck check --threshold ${{ inputs.mutation-threshold }}
