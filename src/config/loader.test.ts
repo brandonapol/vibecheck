@@ -24,18 +24,19 @@ describe('loadConfig', () => {
 
   it('merges partial user config with defaults', async () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true)
-    const mockConfig = { testPatterns: ['**/*.spec.tsx'] }
-    vi.doMock('/fake/agent-tdd.config.ts', () => ({ default: mockConfig }))
+    const mockConfig = { mutation: { threshold: 90 } }
+    vi.doMock('/fake/vibecheck.config.ts', () => ({ default: mockConfig }))
 
     const config = await loadConfig('/fake')
-    expect(config.testPatterns).toEqual(['**/*.spec.tsx'])
+    expect(config.mutation.threshold).toBe(90)
+    expect(config.mutation.tool).toBe('stryker')
     expect(config.protectedBranch).toBe('main')
   })
 
   it('throws on invalid config file contents', async () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true)
-    vi.doMock('/bad/agent-tdd.config.ts', () => ({
-      default: { enforcement: { agents: 'yolo' } },
+    vi.doMock('/bad/vibecheck.config.ts', () => ({
+      default: { mutation: { threshold: 200 } },
     }))
 
     await expect(loadConfig('/bad')).rejects.toThrow()
