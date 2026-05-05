@@ -1,156 +1,162 @@
 # vibecheck-tdd
 
-Pre-commit hooks that enforce test-first discipline on AI coding agents.
+A CI-native test integrity pipeline that prevents AI coding agents from gaming their own test suites. Measures test *quality*, not just test *existence*.
 
-AI agents (Claude Code, Copilot, Cursor, etc.) have full context of both tests and implementation simultaneously. Nothing stops them from retroactively weakening assertions, deleting inconvenient tests, or writing tests and implementation in a single commit. **agent-tdd** makes test integrity a hard constraint rather than a prompt instruction.
+## The Problem
 
-## How it works
+AI coding agents (Claude Code, Copilot, Cursor, etc.) have full context of both tests and implementation simultaneously. Nothing stops an agent from:
 
-agent-tdd enforces a two-phase commit protocol:
+- Writing trivially satisfiable tests (`expect(result).toBeDefined()`)
+- Weakening assertions to make broken implementations pass
+- Deleting or skipping tests that are hard to satisfy
+- Hardcoding return values that satisfy specific example-based test cases
 
-**Phase 1 — Test authoring.** Write tests only. No implementation files are touched. Commit and merge. Those test files are now protected.
+Pre-commit hooks that lock test files are a **logical** constraint — the agent understands the rule and routes around it. vibecheck uses **structural** constraints that are impossible to game.
 
-**Phase 2 — Implementation.** Write code to satisfy the locked tests. Pre-commit hooks reject any modification to files protected in Phase 1.
+## How It Works
 
-Protection is determined by two things:
-1. Whether a file matches configured test patterns (e.g. `**/*.test.ts`)
-2. Whether that file already exists in the target branch (main/master)
+vibecheck layers four complementary checks into a composite integrity score (0-100):
 
-A test file in `main` is protected. A new test file in a feature branch is still in Phase 1 — not yet protected.
+| Analyzer | What it catches | Weight |
+|----------|----------------|--------|
+| **Mutation testing** (Stryker) | Weak assertions that survive code mutations | 40% |
+| **Hidden test suites** | Tests fitted to implementation instead of spec | 30% |
+| **Property-based tests** | Hardcoded return values | 20% |
+| **Semantic diff analysis** | Retroactive assertion weakening | 10% |
 
-### Agent detection
-
-Agent commits are identified by git commit trailers (`Co-Authored-By: Claude`, etc.). agent-tdd uses this signal to apply stricter enforcement to agent commits vs human commits (configurable).
-
-## Quick start
+## Quick Start
 
 ```bash
-npx agent-tdd init
+npm install vibecheck-tdd --save-dev
+npx vibecheck init
 ```
 
-This will:
-1. Detect your package manager
-2. Create `agent-tdd.config.ts` with sensible defaults
-3. Install a pre-commit hook (integrates with Husky if present, or installs standalone)
-4. Print a CLAUDE.md snippet you can append to your project's Claude Code instructions
+This creates:
+- `vibecheck.config.ts` with sensible defaults
+- `.vibecheck-hidden/` directory for hidden tests
+- GitHub Actions workflow (if `.github/workflows/` exists)
+- CLAUDE.md snippet for AI agent instructions
 
-## CLI
+## CLI Commands
 
 ```bash
-npx agent-tdd init      # scaffold config + install hooks
-npx agent-tdd check     # run validation manually (for CI)
-npx agent-tdd status    # show which files are currently protected
+npx vibecheck check             # Run all enabled analyzers
+npx vibecheck check --mutation  # Run mutation analysis only
+npx vibecheck check --semantic  # Run semantic diff only
+npx vibecheck check --threshold 90  # Override score threshold
+npx vibecheck score             # Output composite score (0-100)
+npx vibecheck report            # Generate full integrity report
 ```
 
 ## Configuration
 
 ```typescript
-// agent-tdd.config.ts
-import { defineConfig } from 'agent-tdd'
+// vibecheck.config.ts
+import { defineConfig } from 'vibecheck-tdd'
 
 export default defineConfig({
-  // Glob patterns that identify test files
-  testPatterns: [
-    '**/*.test.ts',
-    '**/*.spec.ts',
-    '**/__tests__/**/*.ts',
-  ],
-
-  // Branch where protected tests live
-  protectedBranch: 'main',
-
-  // Commit trailers that identify agent-authored commits
-  agentTrailers: [
-    'Co-Authored-By: Claude',
-    'Co-Authored-By: GitHub Copilot',
-    'Co-Authored-By: cursor',
-  ],
-
-  // Enforcement levels: 'strict' (block), 'warn' (allow with warning), 'off'
-  enforcement: {
-    agents: 'strict',
-    humans: 'warn',
+  mutation: {
+    enabled: true,
+    tool: 'stryker',
+    threshold: 80,
+    perFileThreshold: 60,
+    include: ['src/**/*.ts'],
+    exclude: ['src/**/*.d.ts'],
   },
-
-  // Paths agents can always modify regardless of phase
-  allowlist: [
-    'src/**/*.mock.ts',
-    'src/**/*.fixture.ts',
-  ],
-
-  // Which hooks to install
-  hooks: {
-    preCommit: true,
-    commitMsg: false,
+  semanticDiff: {
+    enabled: true,
+    enforcement: 'block', // 'block' | 'warn' | 'comment'
   },
+  hiddenTests: {
+    enabled: true,
+    source: 'directory',
+    path: '.vibecheck-hidden',
+  },
+  propertyTests: {
+    enabled: false,
+    framework: 'fast-check',
+    requiredFor: ['src/core/**/*.ts'],
+  },
+  reporters: ['console'],
 })
 ```
 
-## CI integration
+## CI Integration
 
 ### GitHub Actions
 
+vibecheck ships a reusable workflow template. After running `vibecheck init` in a repo with `.github/workflows/`, you'll get a workflow that runs on every PR:
+
 ```yaml
-# .github/workflows/agent-tdd.yml
-name: Agent TDD Check
+# .github/workflows/vibecheck.yml (generated by init)
+name: Vibecheck Test Integrity
 
 on:
-  pull_request:
-    branches: [main]
+  workflow_call:
+    inputs:
+      mutation-threshold:
+        type: number
+        default: 80
 
 jobs:
-  agent-tdd:
-    uses: your-org/agent-tdd/.github/workflows/check.yml@main
-    with:
-      protected-branch: main
+  vibecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx vibecheck check --threshold ${{ inputs.mutation-threshold }}
 ```
 
-The workflow diffs the PR against the base branch, identifies modified test files that exist in base, checks commit trailers for agent identity, and fails with a violation report if protected tests were modified by an agent.
-
-## Husky integration
-
-If Husky is already present, `agent-tdd init` appends to your existing hook:
-
-```bash
-# .husky/pre-commit
-npx lint-staged              # your existing hook
-npx agent-tdd check --hook   # appended by agent-tdd
-```
-
-If Husky is not present, a standalone hook is installed at `.git/hooks/pre-commit`.
-
-## Violation output
+## Example Output
 
 ```
-agent-tdd: Protected test files modified during implementation phase
+vibecheck: Test Integrity Score — 74/100 (threshold: 80) FAIL
 
-  BLOCKED  src/payments/charge.test.ts
-           This file exists in main and cannot be modified by an agent.
-           If this change is intentional, a human must commit it directly.
+  Mutation Score:       82% (threshold: 80)
+  Semantic Diff:        70%
 
-  Tip: Run `npx agent-tdd status` to see all currently protected files.
+  Surviving mutants:
+    src/core/calculator.ts:42 — ArithmeticOperator: replaced with -
+    src/core/calculator.ts:58 — ConditionalExpression: replaced with true
+
+  Assertion weakening detected:
+    src/core/calculator.test.ts — precision-reduction: .toEqual() weakened to .toBeDefined()
 ```
 
-## Using with Claude Code
+## Semantic Diff Analysis
 
-Add this to your project's `CLAUDE.md`:
+vibecheck detects assertion weakening by comparing test files before and after changes:
 
-```markdown
-## Test Authoring Protocol
+| Pattern | Example |
+|---------|---------|
+| Precision reduction | `toEqual(42)` → `toBeDefined()` |
+| Test deletion | Removing a test block entirely |
+| Skip addition | Adding `.skip` to an existing test |
+| Assertion count reduction | Removing `expect()` calls from a test |
 
-This project uses agent-tdd to enforce test integrity.
+Assertion strength rankings: `toBe` (10), `toEqual` (9), `toStrictEqual` (10), `toHaveLength` (8), `toMatchObject` (7), `toContain` (6), `toThrowError` (7), `toThrow` (4), `toBeTruthy` (3), `toBeFalsy` (3), `toBeDefined` (2).
 
-**Phase 1 — Tests only**
-- Write failing tests that describe the desired behavior
-- Do not write any implementation code
-- Commit tests alone: `git commit -m "test: add tests for [feature]"`
+## v0.1.0 (Current)
 
-**Phase 2 — Implementation only**
-- Write implementation to make Phase 1 tests pass
-- Do not modify any test files that already exist in main
-- Do not weaken assertions, skip tests, or change expected values
-- If a test seems wrong, flag it and ask the human to review — do not change it
-```
+- Mutation testing via Stryker
+- Semantic diff assertion weakening detection
+- Composite integrity score with weighted components
+- Console reporter
+- `vibecheck init` / `check` / `score` / `report` CLI
+- GitHub Actions workflow template
+- CLAUDE.md template for AI agents
+
+## Roadmap
+
+**v0.2.0**: Hidden test suite runner, property-based test enforcement, GitHub PR comment reporter
+
+**v0.3.0**: VSCode extension, audit mode, dashboard, monorepo support
 
 ## License
 
