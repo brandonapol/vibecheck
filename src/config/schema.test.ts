@@ -26,9 +26,7 @@ describe('configSchema', () => {
         minIterations: 1000,
       },
       hiddenTests: {
-        enabled: false,
-        source: 'directory' as const,
-        path: '../.vibecheck-hidden',
+        enabled: false as const,
       },
       reporters: ['console' as const],
     }
@@ -37,7 +35,7 @@ describe('configSchema', () => {
     expect(result.mutation.threshold).toBe(80)
     expect(result.semanticDiff.enforcement).toBe('block')
     expect(result.propertyTests.enabled).toBe(false)
-    expect(result.hiddenTests.source).toBe('directory')
+    expect(result.hiddenTests.enabled).toBe(false)
     expect(result.reporters).toEqual(['console'])
   })
 
