@@ -73,6 +73,6 @@ describe('scaffoldProject', () => {
   it('returns CLAUDE.md snippet in result', async () => {
     const result = await scaffoldProject(tmpDir)
     expect(result.claudeSnippet).toContain('Test Integrity Protocol')
-    expect(result.claudeSnippet).toContain('mutation testing')
+    expect(result.claudeSnippet).toContain('Mutation testing')
   })
 })
