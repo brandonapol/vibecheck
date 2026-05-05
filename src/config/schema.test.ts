@@ -26,7 +26,7 @@ describe('configSchema', () => {
         minIterations: 1000,
       },
       hiddenTests: {
-        enabled: false,
+        enabled: true,
         source: 'directory' as const,
         path: '../.vibecheck-hidden',
       },
