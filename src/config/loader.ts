@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { configSchema, defaultConfig, type Config } from './schema.js'
 
-const CONFIG_FILENAME = 'agent-tdd.config.ts'
+const CONFIG_FILENAME = 'vibecheck.config.ts'
 
 export async function loadConfig(cwd?: string): Promise<Config> {
   const dir = cwd ?? process.cwd()
