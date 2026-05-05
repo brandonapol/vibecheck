@@ -2,6 +2,7 @@
 
 import { parseArgs } from '../src/cli/commands.js'
 import { runCheck } from '../src/cli/runner.js'
+import { scaffoldProject } from '../src/cli/init.js'
 import { loadConfig } from '../src/config/loader.js'
 import { runMutationAnalysis } from '../src/analyzers/mutation.js'
 import { detectWeakeningInDiff } from '../src/analyzers/semantic-diff.js'
@@ -48,7 +49,24 @@ async function main() {
   }
 
   if (parsed.command === 'init') {
-    console.log('vibecheck init: not yet implemented')
+    const result = await scaffoldProject(process.cwd())
+
+    if (result.configCreated) {
+      console.log('Created vibecheck.config.ts')
+    } else {
+      console.log('vibecheck.config.ts already exists, skipping')
+    }
+
+    if (result.hiddenDirCreated) {
+      console.log('Created .vibecheck-hidden/ directory')
+    }
+
+    if (result.ciCreated) {
+      console.log('Added .github/workflows/vibecheck.yml')
+    }
+
+    console.log('\nAdd this to your CLAUDE.md:\n')
+    console.log(result.claudeSnippet)
     process.exit(0)
   }
 
