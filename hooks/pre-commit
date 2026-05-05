@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# agent-tdd bootstrap hook (dogfooding)
+#
+# Enforces two-phase commit discipline:
+# - A commit containing test files must NOT also contain implementation files
+# - A commit containing implementation files must NOT also contain test files
+#
+# This will be replaced by `npx agent-tdd check --hook` once the CLI is ready.
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+TEST_FILES=""
+IMPL_FILES=""
+
+for file in $STAGED; do
+  case "$file" in
+    *.test.ts|*.spec.ts|*/__tests__/*)
+      TEST_FILES="$TEST_FILES $file"
+      ;;
+    *.ts|*.js)
+      # Skip config files at root level — they're neither tests nor implementation
+      case "$file" in
+        tsup.config.ts|vitest.config.ts|agent-tdd.config.ts)
+          continue
+          ;;
+      esac
+      IMPL_FILES="$IMPL_FILES $file"
+      ;;
+  esac
+done
+
+if [ -n "$TEST_FILES" ] && [ -n "$IMPL_FILES" ]; then
+  echo ""
+  echo "agent-tdd: Two-phase commit violation"
+  echo ""
+  echo "  A commit must contain EITHER test files OR implementation files, not both."
+  echo ""
+  echo "  Test files staged:"
+  for f in $TEST_FILES; do
+    echo "    $f"
+  done
+  echo ""
+  echo "  Implementation files staged:"
+  for f in $IMPL_FILES; do
+    echo "    $f"
+  done
+  echo ""
+  echo "  Split this into two commits:"
+  echo "    1. Commit tests first:          git commit -m \"test: ...\""
+  echo "    2. Commit implementation second: git commit -m \"feat: ...\""
+  echo ""
+  exit 1
+fi
+
+exit 0

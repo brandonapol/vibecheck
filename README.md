@@ -1,4 +1,4 @@
-# agent-tdd
+# vibecheck-tdd
 
 Pre-commit hooks that enforce test-first discipline on AI coding agents.
 
