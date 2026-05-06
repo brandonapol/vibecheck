@@ -17,6 +17,43 @@ describe('ASSERTION_STRENGTH', () => {
   it('ranks toThrowError higher than toThrow', () => {
     expect(ASSERTION_STRENGTH['toThrowError']).toBeGreaterThan(ASSERTION_STRENGTH['toThrow'])
   })
+
+  it('includes numeric comparison matchers', () => {
+    expect(ASSERTION_STRENGTH['toBeGreaterThan']).toBeGreaterThan(0)
+    expect(ASSERTION_STRENGTH['toBeGreaterThanOrEqual']).toBeGreaterThan(0)
+    expect(ASSERTION_STRENGTH['toBeLessThan']).toBeGreaterThan(0)
+    expect(ASSERTION_STRENGTH['toBeLessThanOrEqual']).toBeGreaterThan(0)
+    expect(ASSERTION_STRENGTH['toBeCloseTo']).toBeGreaterThan(0)
+  })
+
+  it('includes mock/spy matchers', () => {
+    expect(ASSERTION_STRENGTH['toHaveBeenCalled']).toBeGreaterThan(0)
+    expect(ASSERTION_STRENGTH['toHaveBeenCalledWith']).toBeGreaterThan(0)
+    expect(ASSERTION_STRENGTH['toHaveBeenCalledTimes']).toBeGreaterThan(0)
+  })
+
+  it('includes type/instance matchers', () => {
+    expect(ASSERTION_STRENGTH['toBeInstanceOf']).toBeGreaterThan(0)
+    expect(ASSERTION_STRENGTH['toBeNaN']).toBeGreaterThan(0)
+    expect(ASSERTION_STRENGTH['toHaveProperty']).toBeGreaterThan(0)
+  })
+
+  it('includes string/regex matchers', () => {
+    expect(ASSERTION_STRENGTH['toMatch']).toBeGreaterThan(0)
+  })
+
+  it('includes snapshot matchers at low strength', () => {
+    expect(ASSERTION_STRENGTH['toMatchSnapshot']).toBeGreaterThan(0)
+    expect(ASSERTION_STRENGTH['toMatchInlineSnapshot']).toBeGreaterThan(0)
+  })
+
+  it('ranks toBeGreaterThan higher than toBeDefined', () => {
+    expect(ASSERTION_STRENGTH['toBeGreaterThan']).toBeGreaterThan(ASSERTION_STRENGTH['toBeDefined'])
+  })
+
+  it('ranks toHaveBeenCalledWith higher than toHaveBeenCalled', () => {
+    expect(ASSERTION_STRENGTH['toHaveBeenCalledWith']).toBeGreaterThan(ASSERTION_STRENGTH['toHaveBeenCalled'])
+  })
 })
 
 describe('detectWeakeningInDiff', () => {
@@ -159,5 +196,111 @@ describe('detectWeakeningInDiff', () => {
     `
     const violations = detectWeakeningInDiff(before, after, 'my-file.test.ts')
     expect(violations[0].file).toBe('my-file.test.ts')
+  })
+
+  it('detects weakening of toBeGreaterThan to toBeDefined', () => {
+    const before = `
+      it('checks range', () => {
+        expect(getCount()).toBeGreaterThan(5);
+      });
+    `
+    const after = `
+      it('checks range', () => {
+        expect(getCount()).toBeDefined();
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'range.test.ts')
+    expect(violations.length).toBeGreaterThan(0)
+    expect(violations[0].pattern).toBe('precision-reduction')
+  })
+
+  it('ignores assertions inside comments', () => {
+    const before = `
+      it('validates', () => {
+        expect(isValid('test@example.com')).toBe(true);
+        expect(isValid('bad')).toBe(false);
+      });
+    `
+    const after = `
+      it('validates', () => {
+        // expect(isValid('test@example.com')).toBe(true);
+        // expect(isValid('bad')).toBe(false);
+        expect(true).toBe(true);
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'valid.test.ts')
+    expect(violations.some(v => v.pattern === 'assertion-count-reduction')).toBe(true)
+  })
+
+  it('ignores assertions inside block comments', () => {
+    const before = `
+      it('validates', () => {
+        expect(x).toBe(1);
+        expect(y).toBe(2);
+      });
+    `
+    const after = `
+      it('validates', () => {
+        /* expect(x).toBe(1); */
+        expect(y).toBe(2);
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'block.test.ts')
+    expect(violations.some(v => v.pattern === 'assertion-count-reduction')).toBe(true)
+  })
+
+  it('detects tautological assertions', () => {
+    const before = `
+      it('validates email', () => {
+        expect(isValid('test@example.com')).toBe(true);
+        expect(isValid('bad')).toBe(false);
+      });
+    `
+    const after = `
+      it('validates email', () => {
+        expect(true).toBe(true);
+        expect(false).toBe(false);
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'taut.test.ts')
+    expect(violations.some(v => v.pattern === 'tautological-assertion')).toBe(true)
+  })
+
+  it('does not flag non-tautological assertions as tautological', () => {
+    const code = `
+      it('calculates', () => {
+        expect(calculate(10)).toBe(100);
+        expect(calculate(0)).toBe(0);
+      });
+    `
+    const violations = detectWeakeningInDiff(code, code, 'calc.test.ts')
+    expect(violations.some(v => v.pattern === 'tautological-assertion')).toBe(false)
+  })
+
+  it('handles template literal test names', () => {
+    const before = `
+      it(\`handles edge case correctly\`, () => {
+        expect(handle('edge')).toEqual({ ok: true });
+      });
+    `
+    const after = `
+      it(\`handles edge case correctly\`, () => {
+        expect(handle('edge')).toBeDefined();
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'template.test.ts')
+    expect(violations.some(v => v.pattern === 'precision-reduction')).toBe(true)
+  })
+
+  it('parses it.each test blocks', () => {
+    const before = `
+      it('validates 1', () => { expect(validate(1)).toBe(true) })
+      it('validates 2', () => { expect(validate(2)).toBe(true) })
+    `
+    const after = `
+      it.each([1, 2])('validates %i', (n) => { expect(validate(n)).toBeDefined() })
+    `
+    const violations = detectWeakeningInDiff(before, after, 'each.test.ts')
+    expect(violations.some(v => v.pattern === 'test-deletion')).toBe(true)
   })
 })
