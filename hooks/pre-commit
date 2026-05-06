@@ -16,16 +16,19 @@ fi
 
 TEST_FILES=""
 IMPL_FILES=""
+CONFIG_FILES=""
 
 for file in $STAGED; do
   case "$file" in
-    *.test.ts|*.spec.ts|*/__tests__/*)
+    *.test.ts|*.test.tsx|*.spec.ts|*.spec.tsx|*/__tests__/*)
       TEST_FILES="$TEST_FILES $file"
       ;;
-    *.ts|*.js)
-      # Skip config files at root level — they're neither tests nor implementation
+    vibecheck.config.ts|vibecheck.config.js|.vibecheck.config.*)
+      CONFIG_FILES="$CONFIG_FILES $file"
+      ;;
+    *.ts|*.tsx|*.js|*.jsx)
       case "$file" in
-        tsup.config.ts|vitest.config.ts|agent-tdd.config.ts)
+        tsup.config.ts|vitest.config.ts)
           continue
           ;;
       esac
@@ -34,9 +37,11 @@ for file in $STAGED; do
   esac
 done
 
+VIOLATION=0
+
 if [ -n "$TEST_FILES" ] && [ -n "$IMPL_FILES" ]; then
   echo ""
-  echo "agent-tdd: Two-phase commit violation"
+  echo "vibecheck: Two-phase commit violation"
   echo ""
   echo "  A commit must contain EITHER test files OR implementation files, not both."
   echo ""
@@ -54,7 +59,27 @@ if [ -n "$TEST_FILES" ] && [ -n "$IMPL_FILES" ]; then
   echo "    1. Commit tests first:          git commit -m \"test: ...\""
   echo "    2. Commit implementation second: git commit -m \"feat: ...\""
   echo ""
-  exit 1
+  VIOLATION=1
 fi
 
-exit 0
+if [ -n "$CONFIG_FILES" ] && [ -n "$IMPL_FILES" ]; then
+  echo ""
+  echo "vibecheck: Config protection violation"
+  echo ""
+  echo "  vibecheck config files must not be modified in the same commit as"
+  echo "  implementation files. Config changes should be reviewed separately."
+  echo ""
+  echo "  Config files staged:"
+  for f in $CONFIG_FILES; do
+    echo "    $f"
+  done
+  echo ""
+  echo "  Implementation files staged:"
+  for f in $IMPL_FILES; do
+    echo "    $f"
+  done
+  echo ""
+  VIOLATION=1
+fi
+
+exit $VIOLATION
