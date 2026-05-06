@@ -166,11 +166,13 @@ describe('Pre-commit Hook Evasion Attacks', () => {
   })
 
   // =========================================================================
-  // ATTACK 6: Config files are not protected
+  // ATTACK 6: Config files are not protected (FIXED in real hook)
   // Strategy: Agent can modify vibecheck.config.ts alongside implementation
   // because config files don't match the test pattern.
+  // NOTE: This loophole exists in the simplified hook used by this test.
+  // The real hook in hooks/pre-commit now blocks this.
   // =========================================================================
-  it('LOOPHOLE: modifying config alongside impl is not blocked', () => {
+  it('LOOPHOLE (simplified hook only): modifying config alongside impl is not blocked', () => {
     dir = setupRepo(getHookScript())
 
     mkdirSync(join(dir, 'src'), { recursive: true })
@@ -179,6 +181,7 @@ describe('Pre-commit Hook Evasion Attacks', () => {
 
     execaSync('git', ['add', '.'], { cwd: dir })
     const result = execaSync('git', ['commit', '-m', 'feat'], { cwd: dir, reject: false })
-    expect(result.exitCode).toBe(0) // LOOPHOLE: config weakening + impl in one commit
+    expect(result.exitCode).toBe(0) // Simplified hook doesn't protect config
+    // See test/hooks/pre-commit.test.ts for the real hook test that blocks this
   })
 })
