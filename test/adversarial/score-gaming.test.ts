@@ -48,7 +48,7 @@ describe('Score Gaming Attacks', () => {
       expect(score.total).toBe(100) // LOOPHOLE: perfect score with zero test quality
     })
 
-    it('LOOPHOLE: disabling ALL analyzers returns 100 by default', () => {
+    it('FIXED: disabling ALL analyzers now returns 0', () => {
       const results: AnalyzerResults = {
         mutation: { score: 0, enabled: false },
         semanticDiff: { weakeningRate: 1, enabled: false },
@@ -56,7 +56,7 @@ describe('Score Gaming Attacks', () => {
         propertyTests: { coverage: 0, enabled: false },
       }
       const score = calculateScore(results, defaultWeights)
-      expect(score.total).toBe(100) // LOOPHOLE: no checks = perfect score
+      expect(score.total).toBe(0) // FIXED: no checks = zero score
     })
   })
 
