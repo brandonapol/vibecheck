@@ -125,7 +125,7 @@ describe('Semantic Diff Evasion Attacks', () => {
   // They default to strength 0, so replacing them is "no change."
   // =========================================================================
   describe('ATTACK: Use untracked assertion methods', () => {
-    it('LOOPHOLE: toBeGreaterThan has no strength score — invisible to analyzer', () => {
+    it('FIXED: toBeGreaterThan now has a strength score — weakening is caught', () => {
       const before = `
         it('counts items', () => {
           expect(getCount()).toBeGreaterThan(5)
@@ -137,13 +137,11 @@ describe('Semantic Diff Evasion Attacks', () => {
         })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      // toBeGreaterThan is not in ASSERTION_STRENGTH, so its strength is 0.
-      // toBeDefined has strength 2. 2 > 0, so this looks like STRENGTHENING!
       const hasPrecisionReduction = violations.some(v => v.pattern === 'precision-reduction')
-      expect(hasPrecisionReduction).toBe(false) // LOOPHOLE: weakening looks like strengthening
+      expect(hasPrecisionReduction).toBe(true) // FIXED: now caught
     })
 
-    it('LOOPHOLE: toBeGreaterThanOrEqual, toBeLessThan, toBeCloseTo are all invisible', () => {
+    it('FIXED: toBeGreaterThanOrEqual, toBeLessThan, toBeCloseTo are all tracked', () => {
       const before = `
         it('validates range', () => {
           expect(getTemp()).toBeGreaterThanOrEqual(0)
@@ -159,7 +157,7 @@ describe('Semantic Diff Evasion Attacks', () => {
         })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      expect(violations.length).toBe(0) // LOOPHOLE: all three weakenings invisible
+      expect(violations.length).toBe(3) // FIXED: all three weakenings caught
     })
   })
 
@@ -168,7 +166,7 @@ describe('Semantic Diff Evasion Attacks', () => {
   // Strategy: The analyzer detects .skip but not commented-out code.
   // =========================================================================
   describe('ATTACK: Comment out instead of .skip', () => {
-    it('LOOPHOLE: commenting out expect() calls evades skip detection', () => {
+    it('FIXED: commenting out expect() calls now detected via comment stripping', () => {
       const before = `
         it('validates email', () => {
           expect(isValid('test@example.com')).toBe(true)
@@ -183,19 +181,13 @@ describe('Semantic Diff Evasion Attacks', () => {
         })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      // The commented-out lines are invisible. The regex won't match them
-      // because they don't start with .toBe pattern.
-      // But assertion count drops from 2 to 1... let's check
+      // FIXED: comments are now stripped before extraction. After block has
+      // only 1 real assertion (the tautology), down from 2.
       const hasCountReduction = violations.some(v => v.pattern === 'assertion-count-reduction')
-      // LOOPHOLE: commenting out expect() AND adding expect(true).toBe(true)
-      // means the regex finds 1 toBe in the comment line + 1 toBe in tautology = 2.
-      // The regex doesn't distinguish comments from code!
-      // The count stays the same (2 -> 2) so no count reduction is flagged.
-      // And .toBe -> .toBe at each position shows no weakening.
-      expect(hasCountReduction).toBe(false) // DOUBLE LOOPHOLE: regex matches inside comments
+      expect(hasCountReduction).toBe(true) // FIXED: comment stripping catches this
     })
 
-    it('LOOPHOLE: replacing real assertions with tautologies preserves count', () => {
+    it('FIXED: replacing real assertions with tautologies is now detected', () => {
       const before = `
         it('validates email', () => {
           expect(isValid('test@example.com')).toBe(true)
@@ -210,10 +202,9 @@ describe('Semantic Diff Evasion Attacks', () => {
         })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      // Count: 2 -> 2 (no reduction)
-      // Position 0: toBe -> toBe (no weakening)
-      // Position 1: toBe -> toBe (no weakening)
-      expect(violations.length).toBe(0) // LOOPHOLE: tautologies are invisible
+      // FIXED: tautology detection catches expect(true).toBe(true) patterns
+      const hasTautology = violations.some(v => v.pattern === 'tautological-assertion')
+      expect(hasTautology).toBe(true) // FIXED
     })
   })
 
