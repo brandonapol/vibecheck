@@ -52,7 +52,7 @@ export function calculateScore(results: AnalyzerResults, weights: Weights): Inte
     totalWeight += weights.propertyTests
   }
 
-  const total = totalWeight === 0 ? 100 : Math.round(weightedSum / totalWeight)
+  const total = totalWeight === 0 ? 0 : Math.round(weightedSum / totalWeight)
 
   return { total, components }
 }
