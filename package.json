@@ -1,6 +1,6 @@
 {
   "name": "vibecheck-tdd",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Pre-commit hooks that enforce test-first discipline on AI coding agents",
   "type": "module",
   "main": "./dist/index.cjs",
