@@ -97,4 +97,31 @@ describe('pre-commit hook', () => {
       expect(e.stderr || e.message).toContain('src/core/resolver.test.ts')
     }
   })
+
+  it('blocks vibecheck config changes alongside implementation files', () => {
+    writeAndStage(repoDir, 'src/foo.ts')
+    writeAndStage(repoDir, 'vibecheck.config.ts')
+    expect(() => git(repoDir, 'commit -m "feat: sneak config change"')).toThrow(
+      /Config protection violation/
+    )
+  })
+
+  it('allows vibecheck config changes alone', () => {
+    writeAndStage(repoDir, 'vibecheck.config.ts')
+    expect(() => git(repoDir, 'commit -m "chore: update config"')).not.toThrow()
+  })
+
+  it('allows vibecheck config changes alongside test files', () => {
+    writeAndStage(repoDir, 'src/foo.test.ts')
+    writeAndStage(repoDir, 'vibecheck.config.ts')
+    expect(() => git(repoDir, 'commit -m "test: with config"')).not.toThrow()
+  })
+
+  it('recognizes __tests__ directory files as test files', () => {
+    writeAndStage(repoDir, 'src/__tests__/foo.ts')
+    writeAndStage(repoDir, 'src/foo.ts')
+    expect(() => git(repoDir, 'commit -m "bad: mixed __tests__"')).toThrow(
+      /Two-phase commit violation/
+    )
+  })
 })
