@@ -45,7 +45,7 @@ describe('calculateScore', () => {
     expect(score.total).toBe(84)
   })
 
-  it('returns 100 when no analyzers are enabled', () => {
+  it('returns 0 when no analyzers are enabled', () => {
     const results: AnalyzerResults = {
       mutation: { score: 0, enabled: false },
       semanticDiff: { weakeningRate: 1, enabled: false },
@@ -53,7 +53,7 @@ describe('calculateScore', () => {
       propertyTests: { coverage: 0, enabled: false },
     }
     const score = calculateScore(results, defaultWeights)
-    expect(score.total).toBe(100)
+    expect(score.total).toBe(0)
   })
 
   it('converts semantic diff weakening rate to a score', () => {
