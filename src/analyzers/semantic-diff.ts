@@ -70,11 +70,11 @@ function extractTestBlocks(source: string): TestBlock[] {
     const modifier = match[2] ?? ''
     const skipped = modifier === '.skip'
     const name = match[4]
-    const startIdx = match.index
+    const scanStart = match.index + match[0].length
 
     let depth = 0
     let blockStart = -1
-    for (let i = startIdx; i < source.length; i++) {
+    for (let i = scanStart; i < source.length; i++) {
       if (source[i] === '{' && depth === 0) {
         blockStart = i
         depth = 1
@@ -186,10 +186,10 @@ export function detectWeakeningInDiff(
   let tMatch: RegExpExecArray | null
   while ((tMatch = afterTestRegex.exec(strippedAfter)) !== null) {
     const name = tMatch[4]
-    const startIdx = tMatch.index
+    const scanStart = tMatch.index + tMatch[0].length
     let depth = 0
     let blockStart = -1
-    for (let i = startIdx; i < strippedAfter.length; i++) {
+    for (let i = scanStart; i < strippedAfter.length; i++) {
       if (strippedAfter[i] === '{' && depth === 0) {
         blockStart = i
         depth = 1
