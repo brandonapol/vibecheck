@@ -74,8 +74,8 @@ describe('runCheck', () => {
       semanticViolations: [],
     })
 
-    expect(result.pass).toBe(true)
-    expect(result.score.total).toBe(100)
+    expect(result.pass).toBe(false)
+    expect(result.score.total).toBe(0)
     expect(result.score.components.mutation).toBeUndefined()
     expect(result.score.components.semanticDiff).toBeUndefined()
   })

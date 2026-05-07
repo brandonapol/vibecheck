@@ -16,7 +16,7 @@ describe('Semantic Diff Evasion Attacks', () => {
   // But the analyzer only flags deletions, not "is the new test equivalent?"
   // =========================================================================
   describe('ATTACK: Test rename to evade deletion', () => {
-    it('LOOPHOLE: renaming a test with weaker assertions goes undetected', () => {
+    it('FIXED: renaming a test with weaker assertions is now caught', () => {
       const before = `
         it('validates user input strictly', () => {
           expect(validate('bad')).toEqual({ ok: false, error: 'invalid input' })
@@ -30,11 +30,9 @@ describe('Semantic Diff Evasion Attacks', () => {
         })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      // The old test is "deleted" (flagged) but the new weak test is not examined
-      // because it's a "new" test. The agent traded a strong test for a weak one
-      // and only got a deletion warning — the weakness itself is invisible.
-      const hasWeakeningViolation = violations.some(v => v.pattern === 'precision-reduction')
-      expect(hasWeakeningViolation).toBe(false) // LOOPHOLE: no precision-reduction flagged
+      // FIXED: weak-new-test detection catches the renamed test with only weak assertions
+      const hasWeakNew = violations.some(v => v.pattern === 'weak-new-test')
+      expect(hasWeakNew).toBe(true) // FIXED: renamed weak test caught
     })
   })
 
@@ -276,7 +274,7 @@ describe('Semantic Diff Evasion Attacks', () => {
   // The agent writes weak tests on the first commit — no weakening occurred.
   // =========================================================================
   describe('ATTACK: Write weak tests from scratch', () => {
-    it('LOOPHOLE: brand new weak tests have no baseline to detect weakening', () => {
+    it('FIXED: brand new weak tests are now flagged via weak-new-test detection', () => {
       const before = '' // new file, no prior version
       const after = `
         it('works', () => {
@@ -287,7 +285,8 @@ describe('Semantic Diff Evasion Attacks', () => {
         })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      expect(violations.length).toBe(0) // LOOPHOLE: no baseline = no detection
+      const hasWeakNew = violations.some(v => v.pattern === 'weak-new-test')
+      expect(hasWeakNew).toBe(true) // FIXED: weak-new-test catches low-strength assertions
     })
   })
 
