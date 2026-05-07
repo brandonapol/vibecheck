@@ -292,6 +292,21 @@ describe('detectWeakeningInDiff', () => {
     expect(violations.some(v => v.pattern === 'precision-reduction')).toBe(true)
   })
 
+  it('handles template literal test names with ${expressions}', () => {
+    const before = `
+      it(\`handles \${EDGE_CASE} correctly\`, () => {
+        expect(handle(EDGE_CASE)).toEqual({ ok: true });
+      });
+    `
+    const after = `
+      it(\`handles \${EDGE_CASE} correctly\`, () => {
+        expect(handle(EDGE_CASE)).toBeDefined();
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'template-expr.test.ts')
+    expect(violations.some(v => v.pattern === 'precision-reduction')).toBe(true)
+  })
+
   it('parses it.each test blocks', () => {
     const before = `
       it('validates 1', () => { expect(validate(1)).toBe(true) })
