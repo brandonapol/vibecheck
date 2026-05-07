@@ -307,6 +307,45 @@ describe('detectWeakeningInDiff', () => {
     expect(violations.some(v => v.pattern === 'precision-reduction')).toBe(true)
   })
 
+  it('flags new tests that only use weak assertions', () => {
+    const before = ''
+    const after = `
+      it('works', () => {
+        expect(doEverything()).toBeDefined();
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'new.test.ts')
+    expect(violations.some(v => v.pattern === 'weak-new-test')).toBe(true)
+  })
+
+  it('does not flag new tests with strong assertions', () => {
+    const before = ''
+    const after = `
+      it('validates data', () => {
+        expect(getData()).toEqual({ id: 1, name: 'Alice' });
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'new.test.ts')
+    expect(violations.some(v => v.pattern === 'weak-new-test')).toBe(false)
+  })
+
+  it('flags renamed test that weakened assertions', () => {
+    const before = `
+      it('validates user input strictly', () => {
+        expect(validate('bad')).toEqual({ ok: false, error: 'invalid input' });
+        expect(validate('good')).toEqual({ ok: true });
+      });
+    `
+    const after = `
+      it('checks user input', () => {
+        expect(validate('bad')).toBeDefined();
+        expect(validate('good')).toBeDefined();
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'rename.test.ts')
+    expect(violations.some(v => v.pattern === 'weak-new-test')).toBe(true)
+  })
+
   it('parses it.each test blocks', () => {
     const before = `
       it('validates 1', () => { expect(validate(1)).toBe(true) })
