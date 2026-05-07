@@ -214,7 +214,7 @@ describe('Semantic Diff Evasion Attacks', () => {
   // with expressions might confuse it.
   // =========================================================================
   describe('ATTACK: Template literal test names', () => {
-    it('LOOPHOLE: template literal with expression in name breaks matching', () => {
+    it('FIXED: template literal with expression in name now parsed correctly', () => {
       const before = `
         it(\`handles \${EDGE_CASE} correctly\`, () => {
           expect(handle(EDGE_CASE)).toEqual({ ok: true })
@@ -226,15 +226,10 @@ describe('Semantic Diff Evasion Attacks', () => {
         })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      // The regex (.*?) with backtick delimiter should still match...
-      // but ${} in the name might cause issues with the non-greedy match
-      // Let's see if it catches it
       const hasPrecisionReduction = violations.some(v => v.pattern === 'precision-reduction')
-      // LOOPHOLE: Template literals with ${expressions} break the test name regex.
-      // The regex (['"`])(.*?)\3 uses non-greedy match with backtick delimiter,
-      // but ${} is not handled — the match fails entirely, so neither the before
-      // nor after version is parsed as a test block. Invisible to the analyzer.
-      expect(hasPrecisionReduction).toBe(false) // LOOPHOLE: template literal names not parsed
+      // FIXED: brace scanning now starts after the regex match (past the test name),
+      // so ${} braces in template literal names don't confuse the body extractor.
+      expect(hasPrecisionReduction).toBe(true) // FIXED: template literal names parsed
     })
   })
 
