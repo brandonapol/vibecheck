@@ -6,6 +6,7 @@ export type WeakeningPattern =
   | 'skip-addition'
   | 'assertion-count-reduction'
   | 'tautological-assertion'
+  | 'weak-new-test'
 
 export type WeakeningViolation = {
   file: string
@@ -177,6 +178,20 @@ export function detectWeakeningInDiff(
           detail: `Test "${name}": .${beforeBlock.assertions[i]}() weakened to .${afterBlock.assertions[i]}()`,
         })
       }
+    }
+  }
+
+  const WEAK_THRESHOLD = 4
+  for (const [name, afterBlock] of afterByName) {
+    if (beforeByName.has(name)) continue
+    if (afterBlock.assertions.length === 0) continue
+    const maxStrength = Math.max(...afterBlock.assertions.map(getAssertionStrength))
+    if (maxStrength <= WEAK_THRESHOLD) {
+      violations.push({
+        file,
+        pattern: 'weak-new-test',
+        detail: `Test "${name}": new test uses only weak assertions (max strength ${maxStrength})`,
+      })
     }
   }
 
