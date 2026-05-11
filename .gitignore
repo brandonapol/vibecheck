@@ -23,3 +23,6 @@ Thumbs.db
 
 # npm
 *.tgz
+
+# Docs
+site/
