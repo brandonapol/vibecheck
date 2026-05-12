@@ -93,12 +93,39 @@ describe('configSchema', () => {
     }
   })
 
-  it('does not contain old agent-detection fields', () => {
+  it('provides default agent trailers', () => {
     const result = configSchema.parse({})
-    expect(result).not.toHaveProperty('agentTrailers')
-    expect(result).not.toHaveProperty('enforcement')
-    expect(result).not.toHaveProperty('allowlist')
-    expect(result).not.toHaveProperty('hooks')
+    expect(result.agentTrailers).toEqual([
+      'Co-Authored-By: Claude',
+      'Co-Authored-By: GitHub Copilot',
+      'Co-Authored-By: cursor',
+    ])
+  })
+
+  it('provides default enforcement levels', () => {
+    const result = configSchema.parse({})
+    expect(result.enforcement).toEqual({ agents: 'block', humans: 'warn' })
+  })
+
+  it('accepts custom agent trailers', () => {
+    const result = configSchema.parse({
+      agentTrailers: ['Generated-By: my-agent'],
+    })
+    expect(result.agentTrailers).toEqual(['Generated-By: my-agent'])
+  })
+
+  it('accepts custom enforcement levels', () => {
+    const result = configSchema.parse({
+      enforcement: { agents: 'warn', humans: 'off' },
+    })
+    expect(result.enforcement.agents).toBe('warn')
+    expect(result.enforcement.humans).toBe('off')
+  })
+
+  it('rejects invalid enforcement levels', () => {
+    expect(() =>
+      configSchema.parse({ enforcement: { agents: 'yolo' } })
+    ).toThrow()
   })
 })
 

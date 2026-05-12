@@ -71,6 +71,15 @@ const hiddenTestsSchema = z
   ])
   .default({ enabled: false })
 
+const enforcementLevel = z.enum(['block', 'warn', 'off'])
+
+const enforcementSchema = z
+  .object({
+    agents: enforcementLevel.default('block'),
+    humans: enforcementLevel.default('warn'),
+  })
+  .default({})
+
 const reporterSchema = z.enum(['console', 'github', 'gitlab'])
 
 export const configSchema = z.object({
@@ -79,6 +88,16 @@ export const configSchema = z.object({
     .default(['**/*.test.ts', '**/*.spec.ts', '**/__tests__/**/*.ts']),
 
   protectedBranch: z.string().default('main'),
+
+  agentTrailers: z
+    .array(z.string())
+    .default([
+      'Co-Authored-By: Claude',
+      'Co-Authored-By: GitHub Copilot',
+      'Co-Authored-By: cursor',
+    ]),
+
+  enforcement: enforcementSchema,
 
   mutation: mutationSchema,
   semanticDiff: semanticDiffSchema,
