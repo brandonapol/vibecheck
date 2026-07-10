@@ -55,6 +55,7 @@
     }
   },
   "dependencies": {
+    "@babel/parser": "^8.0.4",
     "chalk": "^5.0.0",
     "execa": "^8.0.0",
     "micromatch": "^4.0.0",
