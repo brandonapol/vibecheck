@@ -358,3 +358,238 @@ describe('detectWeakeningInDiff', () => {
     expect(violations.some(v => v.pattern === 'test-deletion')).toBe(true)
   })
 })
+
+describe('detectWeakeningInDiff — multiset strength comparison', () => {
+  it('does not flag pure reordering of assertions', () => {
+    const before = `
+      it('checks parts', () => {
+        expect(result.tags).toContain('a');
+        expect(result.body).toEqual({ id: 1 });
+      });
+    `
+    const after = `
+      it('checks parts', () => {
+        expect(result.body).toEqual({ id: 1 });
+        expect(result.tags).toContain('a');
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'reorder.test.ts')
+    expect(violations).toHaveLength(0)
+  })
+
+  it('does not flag inserting a weaker assertion before an existing strong one', () => {
+    const before = `
+      it('returns data', () => {
+        expect(getData()).toEqual({ id: 1 });
+      });
+    `
+    const after = `
+      it('returns data', () => {
+        expect(getData()).toBeDefined();
+        expect(getData()).toEqual({ id: 1 });
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'insert.test.ts')
+    expect(violations).toHaveLength(0)
+  })
+
+  it('flags removing a strong assertion even when padded with weak ones', () => {
+    const before = `
+      it('processes payment', () => {
+        expect(processPayment(100)).toEqual({ status: 'success' });
+        expect(processPayment(-1)).toEqual({ status: 'error' });
+      });
+    `
+    const after = `
+      it('processes payment', () => {
+        expect(processPayment(100)).toEqual({ status: 'success' });
+        expect(processPayment(0)).toBeDefined();
+        expect(processPayment(null)).toBeDefined();
+        expect(processPayment(-1)).toBeDefined();
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'pad.test.ts')
+    expect(violations.some(v => v.pattern === 'precision-reduction')).toBe(true)
+  })
+
+  it('treats custom matchers as neutral — custom-to-custom is not weakening', () => {
+    const before = `
+      it('custom', () => { expect(a).toBeWithinRange(1, 10) });
+    `
+    const after = `
+      it('custom', () => { expect(a).toBeInRangeOf(1, 10) });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'custom.test.ts')
+    expect(violations.filter(v => v.pattern === 'precision-reduction')).toHaveLength(0)
+  })
+
+  it('flags replacing a strong matcher with an unknown custom matcher', () => {
+    const before = `
+      it('precise', () => { expect(a).toStrictEqual({ id: 1 }) });
+    `
+    const after = `
+      it('precise', () => { expect(a).toLookRoughlyRight() });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'custom-weak.test.ts')
+    expect(violations.some(v => v.pattern === 'precision-reduction')).toBe(true)
+  })
+})
+
+describe('detectWeakeningInDiff — describe-block awareness', () => {
+  it('does not flag moving an unchanged test to a different describe block', () => {
+    const before = `
+      describe('auth', () => {
+        it('validates token', () => {
+          expect(validateToken('abc')).toEqual({ valid: true });
+        });
+      });
+    `
+    const after = `
+      describe('sessions', () => {
+        it('validates token', () => {
+          expect(validateToken('abc')).toEqual({ valid: true });
+        });
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'move.test.ts')
+    expect(violations).toHaveLength(0)
+  })
+
+  it('flags weakening a test that moved between describe blocks', () => {
+    const before = `
+      describe('auth', () => {
+        it('validates token', () => {
+          expect(validateToken('abc')).toEqual({ valid: true });
+        });
+      });
+    `
+    const after = `
+      describe('sessions', () => {
+        it('validates token', () => {
+          expect(validateToken('abc')).toBeDefined();
+        });
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'move-weak.test.ts')
+    expect(violations.some(v => v.pattern === 'precision-reduction')).toBe(true)
+    expect(violations.some(v => v.pattern === 'test-deletion')).toBe(false)
+  })
+
+  it('flags wrapping a test in describe.skip as skip-addition', () => {
+    const before = `
+      it('validates input', () => {
+        expect(validate('')).toBe(false);
+      });
+    `
+    const after = `
+      describe.skip('legacy', () => {
+        it('validates input', () => {
+          expect(validate('')).toBe(false);
+        });
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'wrap-skip.test.ts')
+    expect(violations.some(v => v.pattern === 'skip-addition')).toBe(true)
+  })
+
+  it('distinguishes same-named tests in different describe blocks', () => {
+    const before = `
+      describe('auth', () => {
+        it('validates', () => { expect(a).toEqual({ ok: true }) });
+      });
+      describe('payments', () => {
+        it('validates', () => { expect(b).toEqual({ ok: true }) });
+      });
+    `
+    const after = `
+      describe('auth', () => {
+        it('validates', () => { expect(a).toEqual({ ok: true }) });
+      });
+      describe('payments', () => {
+        it('validates', () => { expect(b).toBeDefined() });
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'collide.test.ts')
+    const reductions = violations.filter(v => v.pattern === 'precision-reduction')
+    expect(reductions).toHaveLength(1)
+    expect(reductions[0].detail).toContain('payments')
+  })
+})
+
+describe('detectWeakeningInDiff — suspicious assertions', () => {
+  it('flags dynamic matcher calls as suspicious-assertion', () => {
+    const before = `
+      it('validates data', () => {
+        expect(getData()).toEqual({ id: 1 });
+      });
+    `
+    const after = `
+      it('validates data', () => {
+        const method = 'toBeDefined';
+        expect(getData())[method]();
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'dynamic.test.ts')
+    expect(violations.some(v => v.pattern === 'suspicious-assertion')).toBe(true)
+  })
+
+  it('counts suspicious calls toward the assertion count', () => {
+    const before = `
+      it('validates data', () => {
+        expect(getData()).toEqual({ id: 1 });
+      });
+    `
+    const after = `
+      it('validates data', () => {
+        const method = 'toBeDefined';
+        expect(getData())[method]();
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'dynamic.test.ts')
+    expect(violations.filter(v => v.pattern === 'assertion-count-reduction')).toHaveLength(0)
+  })
+
+  it('flags suspicious assertions in brand new tests', () => {
+    const before = ''
+    const after = `
+      it('new dodgy test', () => {
+        expect(result)[pick()]();
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'new-dynamic.test.ts')
+    expect(violations.some(v => v.pattern === 'suspicious-assertion')).toBe(true)
+  })
+})
+
+describe('detectWeakeningInDiff — conditional skips', () => {
+  it('flags adding it.skipIf as skip-addition (fail closed)', () => {
+    const before = `
+      it('runs everywhere', () => {
+        expect(run()).toBe(true);
+      });
+    `
+    const after = `
+      it.skipIf(process.env.CI)('runs everywhere', () => {
+        expect(run()).toBe(true);
+      });
+    `
+    const violations = detectWeakeningInDiff(before, after, 'skipif.test.ts')
+    expect(violations.some(v => v.pattern === 'skip-addition')).toBe(true)
+  })
+})
+
+describe('detectWeakeningInDiff — parameterized replacement', () => {
+  it('flags replacing specific tests with a weak it.each as weak-new-test', () => {
+    const before = `
+      it('validates 1', () => { expect(validate(1)).toBe(true) })
+      it('validates 2', () => { expect(validate(2)).toBe(true) })
+      it('validates 3', () => { expect(validate(3)).toBe(true) })
+    `
+    const after = `
+      it.each([1, 2, 3])('validates %i', (n) => { expect(validate(n)).toBeDefined() })
+    `
+    const violations = detectWeakeningInDiff(before, after, 'each-weak.test.ts')
+    expect(violations.filter(v => v.pattern === 'test-deletion')).toHaveLength(3)
+    expect(violations.some(v => v.pattern === 'weak-new-test')).toBe(true)
+  })
+})
