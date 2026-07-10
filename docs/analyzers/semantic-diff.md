@@ -4,10 +4,11 @@ The semantic diff analyzer detects assertion weakening between commits. When an 
 
 ## How It Works
 
-1. Extract test blocks from the before and after versions of a file
-2. Match tests by name across versions
-3. Compare assertion methods at each position within matched tests
-4. Flag any reduction in assertion strength
+1. Parse the before and after versions of the file into a real AST (`@babel/parser`, TypeScript + JSX)
+2. Extract every test — including `it.each`, `test.concurrent`, `xit`, and `it.todo` variants — with its full `describe` path, skip state, and assertion chains
+3. Match tests across versions by describe-path-qualified identity, falling back to bare-name matching so moving a test between `describe` blocks doesn't read as a deletion
+4. Compare the **sorted multiset** of assertion strengths rank by rank: reordering assertions is not weakening, and padding with weak assertions cannot hide a removed strong one
+5. Anything the AST cannot statically resolve — like `expect(x)[method]()` — fails closed as a `suspicious-assertion` violation
 
 ## Assertion Strength Rankings
 
@@ -26,6 +27,8 @@ Every assertion method has a strength score. Higher is more precise:
 | 2 | `toBeDefined`, `toBeUndefined` |
 
 A change from `toEqual` (9) to `toBeDefined` (2) is flagged as precision reduction. A change from `toBeDefined` (2) to `toEqual` (9) is allowed — that's strengthening.
+
+Custom matchers not in the table score a neutral 5: swapping one custom matcher for another is not flagged, but replacing `toStrictEqual` (10) with an unknown matcher is.
 
 ## Detection Patterns
 
@@ -54,13 +57,18 @@ it('handles normal case', () => { ... })
 
 ### Skip Addition
 
-Adding `.skip` to disable a test:
+Disabling a test in any form — `.skip`, `xit`/`xtest`, `.todo`, wrapping in `describe.skip`/`xdescribe`, or conditional `.skipIf(...)`/`.runIf(...)` (treated as skipped, fail closed):
 
 ```typescript
 // Before
 it('validates input', () => { ... })
-// After — FLAGGED
+// After — all FLAGGED
 it.skip('validates input', () => { ... })
+xit('validates input', () => { ... })
+it.skipIf(process.env.CI)('validates input', () => { ... })
+describe.skip('quarantined', () => {
+  it('validates input', () => { ... })
+})
 ```
 
 ### Assertion Count Reduction
@@ -97,13 +105,30 @@ it('works', () => {
 })
 ```
 
+### Suspicious Assertions
+
+Assertion calls the AST cannot statically resolve. Rather than becoming invisible, they are flagged — the analyzer fails closed:
+
+```typescript
+// FLAGGED — the matcher cannot be verified statically
+const method = 'toBeDefined'
+expect(result)[method]()
+```
+
+Suspicious calls still count toward the assertion total, so indirection isn't double-reported as a count reduction.
+
 ## Hardened Against Evasion
 
-The analyzer has been adversarially tested and hardened against these attack vectors:
+The analyzer parses tests with a real AST rather than regexes, and has been adversarially tested against these attack vectors:
 
-- **Comment stripping** — assertions inside `//` or `/* */` comments are excluded before analysis
-- **Template literal names** — test names using `` `${variable}` `` template expressions are parsed correctly
-- **`it.each` support** — parameterized tests using `it.each()` are recognized
-- **31 assertion methods** tracked — including numeric comparisons, mock matchers, and snapshot methods
+- **Reordering and padding** — assertions are compared as a sorted multiset of strengths, so shuffling assertions or padding with weak ones cannot hide a removed strong assertion
+- **`it.each` replacement** — parameterized tests (`it.each`, `test.each`, `it.concurrent.each`) are parsed; replacing precise tests with a weak `.each` is flagged
+- **Dynamic matcher calls** — `expect(x)[method]()` fails closed as `suspicious-assertion`
+- **Skip variants** — `xit`, `xtest`, `.todo`, `describe.skip` ancestors, and conditional `.skipIf`/`.runIf` all register as skips
+- **Comments** — commented-out assertions are ignored by the parser, including block comments
+- **Template literal names** — `` `${variable}` `` expressions in test names are normalized and matched across versions
+- **Modifier chains** — `.not`, `.resolves`, `.rejects`, and `expect.soft` chains resolve to their underlying matcher
+- **Identity collisions** — same-named tests in different `describe` blocks are tracked separately by describe path
+- **31 assertion methods** tracked, with unknown custom matchers scored at a neutral strength instead of zero
 
 See [Adversarial Testing](../adversarial.md) for the full catalog of tested attack vectors.

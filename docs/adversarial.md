@@ -16,13 +16,19 @@ Attacks against the assertion weakening detector.
 
 | Attack | How it works | Defense |
 |--------|-------------|---------|
-| **Gut test body** | Replace strong assertions with weak ones, same test name | Positional assertion strength comparison |
-| **Pad with weak assertions** | Remove strong assertion, add weak ones to maintain count | Position-level comparison catches weakening at each index |
-| **Untracked assertion methods** | Use methods not in the strength map | 31 methods tracked, covering all standard vitest/jest matchers |
-| **Comment out assertions** | Comment out `expect()` instead of using `.skip` | Comments stripped before assertion extraction |
-| **Tautological assertions** | Replace real assertions with `expect(true).toBe(true)` | Tautology pattern detection |
-| **Template literal expressions** | Use `` `${var}` `` in test names to break regex | Brace scanning starts after regex match, skipping name content |
-| **Move between describe blocks** | Move test to different describe block with weaker assertions | Name-based matching is context-independent |
+| **Gut test body** | Replace strong assertions with weak ones, same test name | Sorted-multiset assertion strength comparison |
+| **Pad with weak assertions** | Remove strong assertion, add weak ones to maintain count | Multiset comparison — no ordering or padding hides a strength drop at any rank |
+| **Reorder assertions** | Shuffle assertion order to confuse position checks | Multiset comparison is order-independent (also eliminates reorder false positives) |
+| **Untracked assertion methods** | Use methods not in the strength map | 31 methods tracked; unknown custom matchers score a neutral 5, never a free 0 |
+| **Dynamic method calls** | `expect(result)[method]()` where method is a variable | Fails closed: flagged as `suspicious-assertion` instead of becoming invisible |
+| **`it.each` replacement** | Replace individual tests with weak `it.each` | `.each`/`.concurrent` variants are parsed by the AST; weak replacements flagged |
+| **Skip variant conversion** | Convert `it` to `xit`/`it.todo`, wrap in `describe.skip`, or add `.skipIf(cond)` | All skip variants register as `skip-addition`; conditional skips fail closed |
+| **Weaken through modifier chains** | Weaken `.resolves`/`.rejects`/`.not` assertions | Chains resolve to their underlying matcher before strength comparison |
+| **Comment out assertions** | Comment out `expect()` instead of using `.skip` | AST parsing ignores comments by construction |
+| **Tautological assertions** | Replace real assertions with `expect(true).toBe(true)` | Literal-to-literal detection on the AST |
+| **Template literal expressions** | Use `` `${var}` `` in test names to break the parser | Template names normalized to raw source and matched across versions |
+| **Move between describe blocks** | Move test to different describe block with weaker assertions | Path-qualified identity with bare-name fallback — moves match, weakening still flagged |
+| **Identity collision** | Weaken one of two same-named tests in different describes | Tests are identified by full describe path, not bare name |
 | **Test rename with weakening** | Rename test and weaken assertions | `weak-new-test` detection flags new tests with only low-strength assertions |
 | **Brand new weak tests** | Write weak tests from scratch (no before to compare) | `weak-new-test` detection flags tests below strength threshold |
 
@@ -30,8 +36,8 @@ Attacks against the assertion weakening detector.
 
 | Attack | How it works | Why it's hard to fix |
 |--------|-------------|---------------------|
-| **Dynamic method calls** | `expect(result)[method]()` where method is a variable | Would require runtime analysis, not static regex |
-| **`it.each` replacement** | Replace individual tests with weak `it.each` | Deletions are flagged, but the replacement's weakness is not compared against the originals |
+| **Assertions built at runtime** | Generate `expect` calls via `eval`, loops over matcher tables, or helper wrappers that assert internally | Static analysis sees the call site, not what runs; helper-wrapped assertions count as one call. Mutation testing is the backstop — weak assertions let mutants survive regardless of how they're written |
+| **Semantically weaker arguments** | Keep the matcher but loosen its argument (`toEqual({id: 1})` → `toEqual(expect.anything())`) | Strength scoring ranks matchers, not argument precision; needs argument-level analysis |
 
 ## Pre-commit Hook Evasion
 
