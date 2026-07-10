@@ -1,3 +1,5 @@
+import { extractTests, type ExtractedTest } from './test-ast.js'
+
 export type WeakeningPattern =
   | 'precision-reduction'
   | 'error-relaxation'
@@ -7,6 +9,7 @@ export type WeakeningPattern =
   | 'assertion-count-reduction'
   | 'tautological-assertion'
   | 'weak-new-test'
+  | 'suspicious-assertion'
 
 export type WeakeningViolation = {
   file: string
@@ -50,80 +53,133 @@ export const ASSERTION_STRENGTH: Record<string, number> = {
   toThrowError: 7,
 }
 
-type TestBlock = {
-  name: string
-  assertions: string[]
-  skipped: boolean
+// Custom matchers are neutral: not free (0) so swapping a strong matcher for an
+// unknown one still reads as weakening, not flagged when swapped for each other.
+const UNKNOWN_MATCHER_STRENGTH = 5
+const WEAK_THRESHOLD = 4
+
+function strengthOf(matcher: string): number {
+  return ASSERTION_STRENGTH[matcher] ?? UNKNOWN_MATCHER_STRENGTH
 }
 
-function stripComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/.*$/gm, '')
+function sortedStrengths(test: ExtractedTest): number[] {
+  return test.assertions.map(a => strengthOf(a.matcher)).sort((a, b) => b - a)
 }
 
-function extractTestBlocks(source: string): TestBlock[] {
-  const blocks: TestBlock[] = []
-  const testRegex = /\b(it|test)(\.skip|\.each\b[^)]*\))?\s*\(\s*(['"`])(.*?)\3/g
-  let match: RegExpExecArray | null
+function sortedMatchers(test: ExtractedTest): string[] {
+  return [...test.assertions]
+    .sort((a, b) => strengthOf(b.matcher) - strengthOf(a.matcher))
+    .map(a => a.matcher)
+}
 
-  while ((match = testRegex.exec(source)) !== null) {
-    const modifier = match[2] ?? ''
-    const skipped = modifier === '.skip'
-    const name = match[4]
-    const scanStart = match.index + match[0].length
+// Suspicious (dynamic) calls still count as assertions so indirection is not
+// additionally reported as a count reduction.
+function assertionCount(test: ExtractedTest): number {
+  return test.assertions.length + test.suspicious.length
+}
 
-    let depth = 0
-    let blockStart = -1
-    for (let i = scanStart; i < source.length; i++) {
-      if (source[i] === '{' && depth === 0) {
-        blockStart = i
-        depth = 1
-      } else if (source[i] === '{') {
-        depth++
-      } else if (source[i] === '}') {
-        depth--
-        if (depth === 0) {
-          const rawBody = source.slice(blockStart, i + 1)
-          const body = stripComments(rawBody)
-          const assertions = extractAssertionMethods(body)
-          blocks.push({ name, assertions, skipped })
-          break
-        }
-      }
+type MatchedPair = { before: ExtractedTest; after: ExtractedTest }
+
+/** Two-pass matching: exact id (describe path + name) first, then bare name
+ *  among the leftovers so moving a test between describe blocks does not read
+ *  as a deletion plus a new test. */
+function matchTests(beforeTests: ExtractedTest[], afterTests: ExtractedTest[]): {
+  pairs: MatchedPair[]
+  deleted: ExtractedTest[]
+  added: ExtractedTest[]
+} {
+  const pairs: MatchedPair[] = []
+  const afterById = new Map(afterTests.map(t => [t.id, t]))
+  const matchedAfter = new Set<ExtractedTest>()
+  const unmatchedBefore: ExtractedTest[] = []
+
+  for (const before of beforeTests) {
+    const exact = afterById.get(before.id)
+    if (exact && !matchedAfter.has(exact)) {
+      pairs.push({ before, after: exact })
+      matchedAfter.add(exact)
+    } else {
+      unmatchedBefore.push(before)
     }
   }
 
-  return blocks
-}
-
-const ALL_MATCHERS = Object.keys(ASSERTION_STRENGTH).join('|')
-const ASSERTION_REGEX = new RegExp(`\\.(${ALL_MATCHERS})\\b`, 'g')
-
-function extractAssertionMethods(body: string): string[] {
-  const methods: string[] = []
-  let match: RegExpExecArray | null
-  ASSERTION_REGEX.lastIndex = 0
-  while ((match = ASSERTION_REGEX.exec(body)) !== null) {
-    methods.push(match[1])
+  const deleted: ExtractedTest[] = []
+  for (const before of unmatchedBefore) {
+    const byName = afterTests.find(t => !matchedAfter.has(t) && t.name === before.name)
+    if (byName) {
+      pairs.push({ before, after: byName })
+      matchedAfter.add(byName)
+    } else {
+      deleted.push(before)
+    }
   }
-  return methods
+
+  const added = afterTests.filter(t => !matchedAfter.has(t))
+  return { pairs, deleted, added }
 }
 
-function getAssertionStrength(method: string): number {
-  return ASSERTION_STRENGTH[method] ?? 0
-}
-
-const TAUTOLOGY_PATTERN = /expect\(\s*(true|false|null|undefined|\d+|'[^']*'|"[^"]*")\s*\)\s*\.\s*(toBe|toEqual|toStrictEqual)\s*\(\s*(true|false|null|undefined|\d+|'[^']*'|"[^"]*")\s*\)/g
-
-function countTautologies(body: string): number {
-  TAUTOLOGY_PATTERN.lastIndex = 0
-  let count = 0
-  let match: RegExpExecArray | null
-  while ((match = TAUTOLOGY_PATTERN.exec(body)) !== null) {
-    count++
+function compareMatchedTest(
+  { before, after }: MatchedPair,
+  file: string,
+  violations: WeakeningViolation[],
+): void {
+  if (!before.skipped && after.skipped) {
+    violations.push({
+      file,
+      pattern: 'skip-addition',
+      detail: `Test "${after.id}" was skipped`,
+    })
+    return
   }
-  return count
+
+  const beforeCount = assertionCount(before)
+  const afterCount = assertionCount(after)
+  if (afterCount < beforeCount) {
+    violations.push({
+      file,
+      pattern: 'assertion-count-reduction',
+      detail: `Test "${after.id}": assertions reduced from ${beforeCount} to ${afterCount}`,
+    })
+  }
+
+  // Sorted-multiset comparison: rank-by-rank over descending strengths, so
+  // reordering is not weakening and weak padding cannot hide a removed strong
+  // assertion.
+  const beforeStrengths = sortedStrengths(before)
+  const afterStrengths = sortedStrengths(after)
+  const beforeMatchers = sortedMatchers(before)
+  const afterMatchers = sortedMatchers(after)
+
+  for (let rank = 0; rank < Math.min(beforeStrengths.length, afterStrengths.length); rank++) {
+    if (afterStrengths[rank] < beforeStrengths[rank]) {
+      violations.push({
+        file,
+        pattern: 'precision-reduction',
+        detail: `Test "${after.id}": .${beforeMatchers[rank]}() weakened to .${afterMatchers[rank]}()`,
+      })
+    }
+  }
+}
+
+function reportSuspicious(test: ExtractedTest, file: string, violations: WeakeningViolation[]): void {
+  for (const reason of test.suspicious) {
+    violations.push({
+      file,
+      pattern: 'suspicious-assertion',
+      detail: `Test "${test.id}": ${reason}`,
+    })
+  }
+}
+
+function reportTautologies(test: ExtractedTest, file: string, violations: WeakeningViolation[]): void {
+  const count = test.assertions.filter(a => a.tautological).length
+  if (count > 0) {
+    violations.push({
+      file,
+      pattern: 'tautological-assertion',
+      detail: `Test "${test.id}": ${count} tautological assertion(s) (e.g. expect(true).toBe(true))`,
+    })
+  }
 }
 
 export function detectWeakeningInDiff(
@@ -132,99 +188,34 @@ export function detectWeakeningInDiff(
   file: string,
 ): WeakeningViolation[] {
   const violations: WeakeningViolation[] = []
-  const beforeBlocks = extractTestBlocks(before)
-  const afterBlocks = extractTestBlocks(after)
+  const { pairs, deleted, added } = matchTests(extractTests(before), extractTests(after))
 
-  const beforeByName = new Map(beforeBlocks.map(b => [b.name, b]))
-  const afterByName = new Map(afterBlocks.map(b => [b.name, b]))
-
-  for (const [name, beforeBlock] of beforeByName) {
-    const afterBlock = afterByName.get(name)
-
-    if (!afterBlock) {
-      violations.push({
-        file,
-        pattern: 'test-deletion',
-        detail: `Test "${name}" was deleted`,
-      })
-      continue
-    }
-
-    if (!beforeBlock.skipped && afterBlock.skipped) {
-      violations.push({
-        file,
-        pattern: 'skip-addition',
-        detail: `Test "${name}" was skipped`,
-      })
-      continue
-    }
-
-    if (afterBlock.assertions.length < beforeBlock.assertions.length) {
-      violations.push({
-        file,
-        pattern: 'assertion-count-reduction',
-        detail: `Test "${name}": assertions reduced from ${beforeBlock.assertions.length} to ${afterBlock.assertions.length}`,
-      })
-    }
-
-    for (let i = 0; i < Math.min(beforeBlock.assertions.length, afterBlock.assertions.length); i++) {
-      const beforeStrength = getAssertionStrength(beforeBlock.assertions[i])
-      const afterStrength = getAssertionStrength(afterBlock.assertions[i])
-
-      if (afterStrength < beforeStrength) {
-        violations.push({
-          file,
-          pattern: 'precision-reduction',
-          detail: `Test "${name}": .${beforeBlock.assertions[i]}() weakened to .${afterBlock.assertions[i]}()`,
-        })
-      }
-    }
+  for (const test of deleted) {
+    violations.push({
+      file,
+      pattern: 'test-deletion',
+      detail: `Test "${test.id}" was deleted`,
+    })
   }
 
-  const WEAK_THRESHOLD = 4
-  for (const [name, afterBlock] of afterByName) {
-    if (beforeByName.has(name)) continue
-    if (afterBlock.assertions.length === 0) continue
-    const maxStrength = Math.max(...afterBlock.assertions.map(getAssertionStrength))
+  for (const pair of pairs) {
+    compareMatchedTest(pair, file, violations)
+    reportSuspicious(pair.after, file, violations)
+    reportTautologies(pair.after, file, violations)
+  }
+
+  for (const test of added) {
+    reportSuspicious(test, file, violations)
+    reportTautologies(test, file, violations)
+
+    if (test.assertions.length === 0) continue
+    const maxStrength = Math.max(...test.assertions.map(a => strengthOf(a.matcher)))
     if (maxStrength <= WEAK_THRESHOLD) {
       violations.push({
         file,
         pattern: 'weak-new-test',
-        detail: `Test "${name}": new test uses only weak assertions (max strength ${maxStrength})`,
+        detail: `Test "${test.id}": new test uses only weak assertions (max strength ${maxStrength})`,
       })
-    }
-  }
-
-  // Tautology detection across all after blocks
-  const strippedAfter = stripComments(after)
-  const afterTestRegex = /\b(it|test)(\.skip|\.each\b[^)]*\))?\s*\(\s*(['"`])(.*?)\3/g
-  let tMatch: RegExpExecArray | null
-  while ((tMatch = afterTestRegex.exec(strippedAfter)) !== null) {
-    const name = tMatch[4]
-    const scanStart = tMatch.index + tMatch[0].length
-    let depth = 0
-    let blockStart = -1
-    for (let i = scanStart; i < strippedAfter.length; i++) {
-      if (strippedAfter[i] === '{' && depth === 0) {
-        blockStart = i
-        depth = 1
-      } else if (strippedAfter[i] === '{') {
-        depth++
-      } else if (strippedAfter[i] === '}') {
-        depth--
-        if (depth === 0) {
-          const body = strippedAfter.slice(blockStart, i + 1)
-          const tautCount = countTautologies(body)
-          if (tautCount > 0) {
-            violations.push({
-              file,
-              pattern: 'tautological-assertion',
-              detail: `Test "${name}": ${tautCount} tautological assertion(s) (e.g. expect(true).toBe(true))`,
-            })
-          }
-          break
-        }
-      }
     }
   }
 
