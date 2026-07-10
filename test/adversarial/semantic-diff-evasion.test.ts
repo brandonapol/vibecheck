@@ -69,7 +69,7 @@ describe('Semantic Diff Evasion Attacks', () => {
   // doesn't decrease. The positional check only compares up to min length.
   // =========================================================================
   describe('ATTACK: Pad with weak assertions to hide removal', () => {
-    it('LOOPHOLE: removing strong assertion but adding weak ones to maintain count', () => {
+    it('CAUGHT: removing strong assertion but adding weak ones to maintain count', () => {
       const before = `
         it('processes payment', () => {
           expect(processPayment(100)).toEqual({ status: 'success', amount: 100 })
@@ -91,7 +91,7 @@ describe('Semantic Diff Evasion Attacks', () => {
       expect(hasPrecisionReduction).toBe(true) // Caught in this case
     })
 
-    it('LOOPHOLE: reordering to put weak assertions at the END evades positional check', () => {
+    it('FIXED: multiset comparison catches weak padding regardless of position', () => {
       const before = `
         it('processes payment', () => {
           expect(processPayment(100)).toEqual({ status: 'success', amount: 100 })
@@ -109,11 +109,10 @@ describe('Semantic Diff Evasion Attacks', () => {
         })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      // Position 0: toEqual -> toEqual (fine)
-      // Position 1: toEqual -> toBeDefined (CAUGHT)
-      // But count went UP (2 -> 4), so no assertion-count-reduction
+      // Sorted strengths: before [9, 9], after [9, 2, 2, 2].
+      // Rank 1 dropped from 9 to 2 — no ordering or padding can hide it.
       const hasPrecisionReduction = violations.some(v => v.pattern === 'precision-reduction')
-      expect(hasPrecisionReduction).toBe(true) // Still caught at position 1
+      expect(hasPrecisionReduction).toBe(true) // FIXED: caught by multiset comparison
     })
   })
 
@@ -291,10 +290,10 @@ describe('Semantic Diff Evasion Attacks', () => {
   })
 
   // =========================================================================
-  // ATTACK 9: Use .each() or test.concurrent which the regex may not parse
+  // ATTACK 9: Use .each() or test.concurrent which the regex could not parse
   // =========================================================================
   describe('ATTACK: Use it.each to evade parsing', () => {
-    it('LOOPHOLE: it.each is not matched by the test regex', () => {
+    it('FIXED: it.each is parsed — weak replacement flagged as weak-new-test', () => {
       const before = `
         it('validates 1', () => { expect(validate(1)).toBe(true) })
         it('validates 2', () => { expect(validate(2)).toBe(true) })
@@ -305,20 +304,19 @@ describe('Semantic Diff Evasion Attacks', () => {
         it.each([1, 2, 3])('validates %i', (n) => { expect(validate(n)).toBeDefined() })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      // Three tests "deleted" — but the each is not parsed as a test
       const deletions = violations.filter(v => v.pattern === 'test-deletion')
       expect(deletions.length).toBe(3) // Deletions flagged...
-      // ...but the replacement weak test via .each is invisible
-      const parsed = violations.some(v => v.pattern === 'precision-reduction')
-      expect(parsed).toBe(false) // LOOPHOLE: .each tests are not parsed
+      // ...and the .each replacement is now parsed and flagged as weak
+      const hasWeakNew = violations.some(v => v.pattern === 'weak-new-test')
+      expect(hasWeakNew).toBe(true) // FIXED: .each tests are parsed by the AST
     })
   })
 
   // =========================================================================
-  // ATTACK 10: Use string concatenation to break assertion regex
+  // ATTACK 10: Use indirection to hide the assertion method
   // =========================================================================
-  describe('ATTACK: Break assertion regex with indirection', () => {
-    it('LOOPHOLE: calling assertion method via variable evades regex', () => {
+  describe('ATTACK: Hide the assertion method behind indirection', () => {
+    it('FIXED: dynamic matcher calls fail closed as suspicious-assertion', () => {
       const before = `
         it('validates data', () => {
           expect(getData()).toEqual({ id: 1, name: 'test' })
@@ -332,11 +330,128 @@ describe('Semantic Diff Evasion Attacks', () => {
         })
       `
       const violations = detectWeakeningInDiff(before, after, 'test.ts')
-      // The regex looks for .toBe, .toEqual etc. — dynamic method calls are invisible
-      // Before: 1 assertion (toEqual). After: 0 assertions detected.
+      // The AST cannot resolve the matcher statically, so the call is treated
+      // as suspicious rather than silently invisible.
+      const hasSuspicious = violations.some(v => v.pattern === 'suspicious-assertion')
+      expect(hasSuspicious).toBe(true) // FIXED: fail closed on dynamics
+      // The dynamic call still counts as an assertion, so no spurious
+      // count-reduction is reported on top.
       const hasCountReduction = violations.some(v => v.pattern === 'assertion-count-reduction')
-      expect(hasCountReduction).toBe(true) // Count reduction caught, but...
-      // The actual weakening method is invisible
+      expect(hasCountReduction).toBe(false)
+    })
+  })
+
+  // =========================================================================
+  // ATTACK 11: Convert tests to variants the old regex could not see
+  // =========================================================================
+  describe('ATTACK: Convert to xit / it.todo to dodge skip detection', () => {
+    it('FIXED: converting it to xit is flagged as skip-addition', () => {
+      const before = `
+        it('validates input', () => { expect(validate('')).toBe(false) })
+      `
+      const after = `
+        xit('validates input', () => { expect(validate('')).toBe(false) })
+      `
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'skip-addition')).toBe(true)
+    })
+
+    it('FIXED: converting it to it.todo is flagged as skip-addition', () => {
+      const before = `
+        it('validates input', () => { expect(validate('')).toBe(false) })
+      `
+      const after = `
+        it.todo('validates input')
+      `
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'skip-addition')).toBe(true)
+    })
+
+    it('FIXED: wrapping tests in describe.skip is flagged as skip-addition', () => {
+      const before = `
+        it('validates input', () => { expect(validate('')).toBe(false) })
+      `
+      const after = `
+        describe.skip('quarantined', () => {
+          it('validates input', () => { expect(validate('')).toBe(false) })
+        })
+      `
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'skip-addition')).toBe(true)
+    })
+
+    it('FIXED: adding it.skipIf(condition) is flagged as skip-addition (fail closed)', () => {
+      const before = `
+        it('validates input', () => { expect(validate('')).toBe(false) })
+      `
+      const after = `
+        it.skipIf(process.env.CI)('validates input', () => { expect(validate('')).toBe(false) })
+      `
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'skip-addition')).toBe(true)
+    })
+  })
+
+  // =========================================================================
+  // ATTACK 12: Weaken async assertion chains (.resolves / .rejects / .not)
+  // =========================================================================
+  describe('ATTACK: Weaken through modifier chains', () => {
+    it('FIXED: weakening a .resolves chain is caught', () => {
+      const before = `
+        it('loads user', async () => {
+          await expect(loadUser(1)).resolves.toEqual({ id: 1, name: 'Alice' })
+        })
+      `
+      const after = `
+        it('loads user', async () => {
+          await expect(loadUser(1)).resolves.toBeDefined()
+        })
+      `
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'precision-reduction')).toBe(true)
+    })
+
+    it('FIXED: weakening a .rejects error assertion is caught', () => {
+      const before = `
+        it('rejects bad input', async () => {
+          await expect(save(null)).rejects.toThrowError('invalid input')
+        })
+      `
+      const after = `
+        it('rejects bad input', async () => {
+          await expect(save(null)).rejects.toThrow()
+        })
+      `
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'precision-reduction')).toBe(true)
+    })
+  })
+
+  // =========================================================================
+  // ATTACK 13: Exploit test-identity collisions across describe blocks
+  // =========================================================================
+  describe('ATTACK: Same-named tests in different describe blocks', () => {
+    it('FIXED: weakening one of two same-named tests is attributed correctly', () => {
+      const before = `
+        describe('auth', () => {
+          it('validates', () => { expect(a).toEqual({ ok: true }) })
+        })
+        describe('payments', () => {
+          it('validates', () => { expect(b).toEqual({ ok: true }) })
+        })
+      `
+      const after = `
+        describe('auth', () => {
+          it('validates', () => { expect(a).toEqual({ ok: true }) })
+        })
+        describe('payments', () => {
+          it('validates', () => { expect(b).toBeDefined() })
+        })
+      `
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      const reductions = violations.filter(v => v.pattern === 'precision-reduction')
+      expect(reductions).toHaveLength(1)
+      expect(reductions[0].detail).toContain('payments')
     })
   })
 })
