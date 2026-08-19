@@ -93,4 +93,41 @@ describe('calculateScore', () => {
     // (40*83 + 10*100) / 50 = (3320 + 1000) / 50 = 86.4
     expect(score.total).toBe(86)
   })
+
+  it('excludes an enabled analyzer that did not run this pass from the weighted total', () => {
+    const results: AnalyzerResults = {
+      mutation: { score: 100, enabled: true, ran: false },
+      semanticDiff: { weakeningRate: 0, enabled: true, ran: true },
+      hiddenTests: { passRate: 0, enabled: false },
+      propertyTests: { coverage: 0, enabled: false },
+    }
+    const score = calculateScore(results, defaultWeights)
+    // mutation didn't run, so only semanticDiff (weight 10) counts: (10*100)/10 = 100
+    expect(score.total).toBe(100)
+    expect(score.components.mutation).toBeUndefined()
+  })
+
+  it('marks an enabled analyzer that did not run this pass as skipped', () => {
+    const results: AnalyzerResults = {
+      mutation: { score: 100, enabled: true, ran: false },
+      semanticDiff: { weakeningRate: 0, enabled: true, ran: true },
+      hiddenTests: { passRate: 0, enabled: false },
+      propertyTests: { coverage: 0, enabled: false },
+    }
+    const score = calculateScore(results, defaultWeights)
+    expect(score.skipped).toContain('mutation')
+    expect(score.skipped).not.toContain('semanticDiff')
+  })
+
+  it('treats an analyzer as ran when `ran` is omitted, for backwards compatibility', () => {
+    const results: AnalyzerResults = {
+      mutation: { score: 90, enabled: true },
+      semanticDiff: { weakeningRate: 0, enabled: true },
+      hiddenTests: { passRate: 0, enabled: false },
+      propertyTests: { coverage: 0, enabled: false },
+    }
+    const score = calculateScore(results, defaultWeights)
+    expect(score.components.mutation).toBe(90)
+    expect(score.skipped ?? []).not.toContain('mutation')
+  })
 })

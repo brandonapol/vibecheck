@@ -71,6 +71,18 @@ describe('formatReport', () => {
     expect(output).not.toContain('Property Coverage')
   })
 
+  it('shows a skipped analyzer as unscored instead of a stale number', () => {
+    const score: IntegrityScore = {
+      total: 90,
+      components: { semanticDiff: 90 },
+      skipped: ['mutation'],
+    }
+    const output = formatReport(score, 80, {})
+    expect(output).toContain('Mutation Score')
+    expect(output).toContain('skipped')
+    expect(output).not.toContain('100%')
+  })
+
   it('shows all enabled components', () => {
     const score: IntegrityScore = {
       total: 80,

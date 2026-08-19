@@ -109,6 +109,30 @@ describe('runCheck', () => {
     expect(result.report).toContain('ArithmeticOperator')
   })
 
+  it('marks mutation as skipped, not scored, when it did not run this invocation', async () => {
+    const config = makeConfig()
+    const result = await runCheck(config, {
+      mutationScore: 100,
+      mutationRan: false,
+      semanticViolations: [],
+    })
+
+    expect(result.score.components.mutation).toBeUndefined()
+    expect(result.score.skipped).toContain('mutation')
+  })
+
+  it('marks semantic diff as skipped, not scored, when it did not run this invocation', async () => {
+    const config = makeConfig()
+    const result = await runCheck(config, {
+      mutationScore: 90,
+      semanticViolations: [],
+      semanticRan: false,
+    })
+
+    expect(result.score.components.semanticDiff).toBeUndefined()
+    expect(result.score.skipped).toContain('semanticDiff')
+  })
+
   it('uses configurable threshold for pass/fail', async () => {
     const config = makeConfig({
       mutation: { ...defaultConfig.mutation, threshold: 90 },
