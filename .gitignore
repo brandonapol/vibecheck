@@ -6,6 +6,8 @@ dist/
 
 # Test
 coverage/
+.stryker-output/
+.stryker-tmp/
 
 # OS
 .DS_Store

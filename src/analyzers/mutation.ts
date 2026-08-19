@@ -112,7 +112,6 @@ export async function runMutationAnalysis(config: MutationConfig): Promise<Mutat
     '--no-install',
     'stryker', 'run',
     '--reporters', 'json',
-    '--jsonReporter.fileName', STRYKER_REPORT_PATH,
   ])
 
   const raw = await readFile(STRYKER_REPORT_PATH, 'utf-8')
