@@ -109,6 +109,7 @@ const STRYKER_REPORT_PATH = '.stryker-output/report.json'
 
 export async function runMutationAnalysis(config: MutationConfig): Promise<MutationReport> {
   await execa('npx', [
+    '--no-install',
     'stryker', 'run',
     '--reporters', 'json',
     '--jsonReporter.fileName', STRYKER_REPORT_PATH,
