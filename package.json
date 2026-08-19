@@ -62,6 +62,8 @@
     "zod": "^3.0.0"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^8.7.1",
+    "@stryker-mutator/vitest-runner": "^8.7.1",
     "@types/micromatch": "^4.0.0",
     "@types/node": "^25.6.0",
     "tsup": "^8.0.0",
