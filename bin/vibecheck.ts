@@ -108,7 +108,9 @@ async function main() {
     const result = await runCheck(effectiveConfig, {
       mutationScore,
       mutationReport,
+      mutationRan: runMutation,
       semanticViolations,
+      semanticRan: runSemantic,
     })
 
     if (parsed.command === 'score') {

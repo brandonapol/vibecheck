@@ -7,7 +7,9 @@ import { formatReport } from '../reporters/console.js'
 export type AnalyzerInputs = {
   mutationScore: number
   mutationReport?: MutationReport
+  mutationRan?: boolean
   semanticViolations: WeakeningViolation[]
+  semanticRan?: boolean
 }
 
 export type CheckResult = {
@@ -32,10 +34,12 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
     mutation: {
       score: inputs.mutationScore,
       enabled: config.mutation.enabled,
+      ran: inputs.mutationRan,
     },
     semanticDiff: {
       weakeningRate,
       enabled: config.semanticDiff.enabled,
+      ran: inputs.semanticRan,
     },
     hiddenTests: {
       passRate: 0,

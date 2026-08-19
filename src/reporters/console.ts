@@ -18,20 +18,28 @@ export function formatReport(
   lines.push(`vibecheck: Test Integrity Score — ${score.total}/100 (threshold: ${threshold}) ${status}`)
   lines.push('')
 
-  if (score.components.mutation !== undefined) {
+  if (score.skipped?.includes('mutation')) {
+    lines.push('  Mutation Score:       — (skipped)')
+  } else if (score.components.mutation !== undefined) {
     lines.push(`  Mutation Score:       ${score.components.mutation}% (threshold: ${threshold})`)
   }
 
-  if (score.components.semanticDiff !== undefined) {
+  if (score.skipped?.includes('semanticDiff')) {
+    lines.push('  Semantic Diff:        — (skipped)')
+  } else if (score.components.semanticDiff !== undefined) {
     const label = score.components.semanticDiff === 100 ? 'Clean' : `${score.components.semanticDiff}%`
     lines.push(`  Semantic Diff:        ${label}`)
   }
 
-  if (score.components.hiddenTests !== undefined) {
+  if (score.skipped?.includes('hiddenTests')) {
+    lines.push('  Hidden Tests:         — (skipped)')
+  } else if (score.components.hiddenTests !== undefined) {
     lines.push(`  Hidden Tests:         ${score.components.hiddenTests}%`)
   }
 
-  if (score.components.propertyTests !== undefined) {
+  if (score.skipped?.includes('propertyTests')) {
+    lines.push('  Property Coverage:    — (skipped)')
+  } else if (score.components.propertyTests !== undefined) {
     lines.push(`  Property Coverage:    ${score.components.propertyTests}%`)
   }
 
