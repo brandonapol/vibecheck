@@ -159,6 +159,15 @@ describe('runMutationAnalysis', () => {
     expect(args[0]).toBe('--no-install')
   })
 
+  it('does not pass --jsonReporter.fileName, which is not a real stryker CLI flag', async () => {
+    mockExeca.mockResolvedValueOnce({} as any)
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(sampleStrykerReport))
+
+    await runMutationAnalysis(defaultMutationConfig)
+    const [, args] = mockExeca.mock.calls[0]
+    expect(args).not.toContain('--jsonReporter.fileName')
+  })
+
   it('throws when stryker fails', async () => {
     mockExeca.mockRejectedValueOnce(new Error('stryker crashed'))
 
