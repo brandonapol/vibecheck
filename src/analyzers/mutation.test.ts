@@ -146,8 +146,17 @@ describe('runMutationAnalysis', () => {
     expect(report.overallScore).toBe(80)
     expect(mockExeca).toHaveBeenCalledWith(
       'npx',
-      expect.arrayContaining(['stryker', 'run']),
+      expect.arrayContaining(['--no-install', 'stryker', 'run']),
     )
+  })
+
+  it('uses --no-install so npx never falls back to installing the wrong "stryker" package from the registry', async () => {
+    mockExeca.mockResolvedValueOnce({} as any)
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(sampleStrykerReport))
+
+    await runMutationAnalysis(defaultMutationConfig)
+    const [, args] = mockExeca.mock.calls[0]
+    expect(args[0]).toBe('--no-install')
   })
 
   it('throws when stryker fails', async () => {
