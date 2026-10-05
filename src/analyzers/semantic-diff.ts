@@ -13,6 +13,7 @@ export type WeakeningPattern =
   | 'assertion-changed'
   | 'test-body-changed'
   | 'setup-changed'
+  | 'assertion-neutralized'
 
 export type WeakeningViolation = {
   file: string
@@ -177,6 +178,7 @@ function compareMatchedTest(
   }
 
   reportChangedAssertions({ before, after }, file, violations)
+  reportNeutralizedAssertions({ before, after }, file, violations)
 
   if (before.bodyKey !== after.bodyKey) {
     violations.push({
@@ -210,6 +212,28 @@ function reportChangedAssertions(
       file,
       pattern: 'assertion-changed',
       detail: `Test "${after.id}": ${snippet(original.source)} → ${partner ? snippet(partner.source) : '(removed)'}`,
+    })
+  }
+}
+
+/** An assertion that always ran on base but can now be skipped by a branch,
+ *  loop, or swallowing try/catch. */
+function reportNeutralizedAssertions(
+  { before, after }: MatchedPair,
+  file: string,
+  violations: WeakeningViolation[],
+): void {
+  const unconditionalAfter = after.assertions.filter(a => !a.conditional)
+  const conditionalAfter = after.assertions.filter(a => a.conditional)
+
+  for (const original of before.assertions) {
+    if (original.conditional) continue
+    if (takeByKey(unconditionalAfter, original.key)) continue
+    if (!takeByKey(conditionalAfter, original.key)) continue
+    violations.push({
+      file,
+      pattern: 'assertion-neutralized',
+      detail: `Test "${after.id}": ${snippet(original.source)} now runs only conditionally`,
     })
   }
 }
@@ -276,6 +300,13 @@ export function detectWeakeningInDiff(
     reportTautologies(test, file, violations)
 
     if (test.assertions.length === 0) continue
+    if (test.assertions.every(a => a.conditional)) {
+      violations.push({
+        file,
+        pattern: 'assertion-neutralized',
+        detail: `Test "${test.id}": every assertion is behind a branch, loop, or swallowing try/catch`,
+      })
+    }
     const maxStrength = Math.max(...test.assertions.map(a => strengthOf(a.matcher)))
     if (maxStrength <= WEAK_THRESHOLD) {
       violations.push({
