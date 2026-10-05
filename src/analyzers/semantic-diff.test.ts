@@ -593,3 +593,134 @@ describe('detectWeakeningInDiff — parameterized replacement', () => {
     expect(violations.some(v => v.pattern === 'weak-new-test')).toBe(true)
   })
 })
+
+describe('detectWeakeningInDiff — assertion-changed', () => {
+  it('flags a changed expected value and shows before and after', () => {
+    const before = `it('taxes', () => { expect(tax(100)).toBe(8.25) })`
+    const after = `it('taxes', () => { expect(tax(100)).toBe(8) })`
+    const violations = detectWeakeningInDiff(before, after, 'tax.test.ts')
+    const changed = violations.filter(v => v.pattern === 'assertion-changed')
+    expect(changed).toHaveLength(1)
+    expect(changed[0].detail).toContain('expect(tax(100)).toBe(8.25)')
+    expect(changed[0].detail).toContain('expect(tax(100)).toBe(8)')
+  })
+
+  it('does not flag reformatting', () => {
+    const before = `it('t', () => { expect(sum([1, 2])).toEqual({ total: 3 }) })`
+    const after = `
+      it('t', () => {
+        expect(
+          sum([1,2,]),
+        ).toEqual({ "total": 3, });
+      })
+    `
+    expect(detectWeakeningInDiff(before, after, 'fmt.test.ts')).toHaveLength(0)
+  })
+
+  it('does not flag adding a new assertion', () => {
+    const before = `it('t', () => { expect(f()).toBe(1) })`
+    const after = `it('t', () => { expect(f()).toBe(1); expect(g()).toEqual([2]) })`
+    expect(detectWeakeningInDiff(before, after, 'add.test.ts')).toHaveLength(0)
+  })
+
+  it('does not flag replacing an already-weak assertion', () => {
+    const before = `it('t', () => { expect(f()).toBeDefined() })`
+    const after = `it('t', () => { expect(f()).toBe(42) })`
+    expect(detectWeakeningInDiff(before, after, 'weak.test.ts')).toHaveLength(0)
+  })
+
+  it('flags a strong assertion rewritten into a different strong form', () => {
+    const before = `it('t', () => { expect(list).toHaveLength(3) })`
+    const after = `it('t', () => { expect(list.length > 0).toBe(true) })`
+    const violations = detectWeakeningInDiff(before, after, 'rewrite.test.ts')
+    expect(violations.some(v => v.pattern === 'assertion-changed')).toBe(true)
+  })
+
+  it('reports a removed strong assertion as changed to nothing', () => {
+    const before = `it('t', () => { expect(a).toBe(1); expect(b).toBe(2) })`
+    const after = `it('t', () => { expect(a).toBe(1) })`
+    const changed = detectWeakeningInDiff(before, after, 'rm.test.ts').filter(
+      v => v.pattern === 'assertion-changed',
+    )
+    expect(changed).toHaveLength(1)
+    expect(changed[0].detail).toContain('expect(b).toBe(2)')
+    expect(changed[0].detail).toContain('removed')
+  })
+
+  it('does not apply to brand-new tests', () => {
+    const before = ``
+    const after = `it('t', () => { expect(f()).toBe(1) })`
+    const violations = detectWeakeningInDiff(before, after, 'new.test.ts')
+    expect(violations.some(v => v.pattern === 'assertion-changed')).toBe(false)
+  })
+})
+
+describe('detectWeakeningInDiff — test-body-changed', () => {
+  it('flags an input edited outside the assertion', () => {
+    const before = `it('parses', () => { const input = '1,234.5'; expect(parse(input)).toBe(1234.5) })`
+    const after = `it('parses', () => { const input = '1234.5'; expect(parse(input)).toBe(1234.5) })`
+    const violations = detectWeakeningInDiff(before, after, 'parse.test.ts')
+    expect(violations.some(v => v.pattern === 'test-body-changed')).toBe(true)
+  })
+
+  it('flags an edited it.each table', () => {
+    const before = `it.each([[100, 8.25]])('tax %i', (a, b) => { expect(tax(a)).toBe(b) })`
+    const after = `it.each([[100, 8]])('tax %i', (a, b) => { expect(tax(a)).toBe(b) })`
+    const violations = detectWeakeningInDiff(before, after, 'each.test.ts')
+    expect(violations.some(v => v.pattern === 'test-body-changed')).toBe(true)
+  })
+
+  it('does not flag a body that only gained assertions', () => {
+    const before = `it('t', () => { const x = f(); expect(x).toBe(1) })`
+    const after = `it('t', () => { const x = f(); expect(x).toBe(1); expect(x).not.toBeNull() })`
+    expect(detectWeakeningInDiff(before, after, 'grow.test.ts')).toHaveLength(0)
+  })
+})
+
+describe('detectWeakeningInDiff — setup-changed', () => {
+  it('flags an edited top-level constant used by tests', () => {
+    const before = `
+      const EXPECTED = 8.25
+      it('t', () => { expect(tax(100)).toBe(EXPECTED) })
+    `
+    const after = `
+      const EXPECTED = 8
+      it('t', () => { expect(tax(100)).toBe(EXPECTED) })
+    `
+    const violations = detectWeakeningInDiff(before, after, 'const.test.ts')
+    const changed = violations.filter(v => v.pattern === 'setup-changed')
+    expect(changed).toHaveLength(1)
+    expect(changed[0].detail).toContain('const EXPECTED = 8.25')
+  })
+
+  it('flags an edited beforeEach hook', () => {
+    const before = `
+      describe('d', () => {
+        beforeEach(() => { config.strict = true })
+        it('t', () => { expect(run()).toBe(1) })
+      })
+    `
+    const after = `
+      describe('d', () => {
+        beforeEach(() => { config.strict = false })
+        it('t', () => { expect(run()).toBe(1) })
+      })
+    `
+    const violations = detectWeakeningInDiff(before, after, 'hook.test.ts')
+    expect(violations.some(v => v.pattern === 'setup-changed')).toBe(true)
+  })
+
+  it('does not flag added helpers or changed imports', () => {
+    const before = `
+      import { a } from './a'
+      it('t', () => { expect(a()).toBe(1) })
+    `
+    const after = `
+      import { a, b } from './a'
+      const helper = () => b()
+      it('t', () => { expect(a()).toBe(1) })
+      it('u', () => { expect(helper()).toBe(2) })
+    `
+    expect(detectWeakeningInDiff(before, after, 'helpers.test.ts')).toHaveLength(0)
+  })
+})

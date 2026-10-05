@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractTests, type ExtractedTest } from './test-ast.js'
+import { extractTests, extractSetup, type ExtractedTest } from './test-ast.js'
 
 function byId(tests: ExtractedTest[], id: string): ExtractedTest | undefined {
   return tests.find(t => t.id === id)
@@ -405,5 +405,130 @@ describe('extractTests — comments and syntax', () => {
   it('returns an empty list for source with no tests', () => {
     expect(extractTests('const a = 1')).toEqual([])
     expect(extractTests('')).toEqual([])
+  })
+})
+
+describe('extractTests — structural assertion keys', () => {
+  function onlyAssertion(source: string) {
+    return extractTests(source)[0].assertions[0]
+  }
+
+  it('gives formatting-only variants the same key', () => {
+    const a = onlyAssertion(`it('t', () => { expect(sum([1, 2])).toEqual({ total: 3 }) })`)
+    const b = onlyAssertion(`
+      it('t', () => {
+        expect(
+          sum([1,2,]),
+        ).toEqual({ "total": 3, });
+      })
+    `)
+    expect(a.key).toBe(b.key)
+  })
+
+  it('treats single and double quoted strings as the same', () => {
+    const a = onlyAssertion(`it('t', () => { expect(f('x')).toBe('y') })`)
+    const b = onlyAssertion(`it('t', () => { expect(f("x")).toBe("y") })`)
+    expect(a.key).toBe(b.key)
+  })
+
+  it('changes the key when the expected value changes', () => {
+    const a = onlyAssertion(`it('t', () => { expect(tax(100)).toBe(8.25) })`)
+    const b = onlyAssertion(`it('t', () => { expect(tax(100)).toBe(8) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('changes the key when the expect argument changes', () => {
+    const a = onlyAssertion(`it('t', () => { expect(parse('1,234.5')).toBe(1234.5) })`)
+    const b = onlyAssertion(`it('t', () => { expect(parse('1234.5')).toBe(1234.5) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('changes the key when a matcher argument like precision changes', () => {
+    const a = onlyAssertion(`it('t', () => { expect(f()).toBeCloseTo(3.14159, 5) })`)
+    const b = onlyAssertion(`it('t', () => { expect(f()).toBeCloseTo(3.14159, 1) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('changes the key when .not is added', () => {
+    const a = onlyAssertion(`it('t', () => { expect(r).toBe(5) })`)
+    const b = onlyAssertion(`it('t', () => { expect(r).not.toBe(5) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('changes the key when a regex is loosened', () => {
+    const a = onlyAssertion(`it('t', () => { expect(s).toMatch(/^\\d{3}$/) })`)
+    const b = onlyAssertion(`it('t', () => { expect(s).toMatch(/\\d/) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('exposes the original assertion source for reporting', () => {
+    const a = onlyAssertion(`it('t', () => { expect(tax(100)).toBe(8.25) })`)
+    expect(a.source).toBe('expect(tax(100)).toBe(8.25)')
+  })
+})
+
+describe('extractTests — body keys', () => {
+  function bodyKey(source: string): string {
+    return extractTests(source)[0].bodyKey
+  }
+
+  it('ignores formatting differences', () => {
+    expect(bodyKey(`it('t', () => { const input = 'a'; expect(f(input)).toBe(1) })`)).toBe(
+      bodyKey(`
+        it('t', () => {
+          const input = "a"
+          expect(f(input)).toBe(1)
+        })
+      `),
+    )
+  })
+
+  it('ignores added, removed, or changed assertions', () => {
+    expect(bodyKey(`it('t', () => { const x = f(); expect(x).toBe(1) })`)).toBe(
+      bodyKey(`it('t', () => { const x = f(); expect(x).toBe(2); expect(x).toBeDefined() })`),
+    )
+  })
+
+  it('changes when setup code inside the test changes', () => {
+    expect(bodyKey(`it('t', () => { const input = '1,234.5'; expect(parse(input)).toBe(1234.5) })`)).not.toBe(
+      bodyKey(`it('t', () => { const input = '1234.5'; expect(parse(input)).toBe(1234.5) })`),
+    )
+  })
+
+  it('changes when an it.each table changes', () => {
+    expect(bodyKey(`it.each([[100, 8.25]])('tax %i', (a, b) => { expect(tax(a)).toBe(b) })`)).not.toBe(
+      bodyKey(`it.each([[100, 8]])('tax %i', (a, b) => { expect(tax(a)).toBe(b) })`),
+    )
+  })
+})
+
+describe('extractSetup', () => {
+  it('collects top-level and describe-level statements that are not tests', () => {
+    const setup = extractSetup(`
+      import { f } from './f'
+      const EXPECTED = 8.25
+      describe('tax', () => {
+        beforeEach(() => { reset() })
+        it('t', () => { expect(f()).toBe(EXPECTED) })
+      })
+    `)
+    const sources = setup.map(s => s.source)
+    expect(sources).toContain('const EXPECTED = 8.25')
+    expect(sources.some(s => s.startsWith('beforeEach'))).toBe(true)
+    expect(sources.some(s => s.startsWith('import'))).toBe(false)
+    expect(sources.some(s => s.startsWith('it('))).toBe(false)
+    expect(sources.some(s => s.startsWith('describe('))).toBe(false)
+  })
+
+  it('gives formatting-only variants the same key', () => {
+    const [a] = extractSetup(`const EXPECTED = { rate: 'x' }`)
+    const [b] = extractSetup(`const EXPECTED = {\n  rate: "x",\n};`)
+    expect(a.key).toBe(b.key)
+  })
+
+  it('changes the key when a constant value changes', () => {
+    const [a] = extractSetup(`const EXPECTED = 8.25`)
+    const [b] = extractSetup(`const EXPECTED = 8`)
+    expect(a.key).not.toBe(b.key)
   })
 })

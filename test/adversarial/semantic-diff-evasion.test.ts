@@ -454,4 +454,52 @@ describe('Semantic Diff Evasion Attacks', () => {
       expect(reductions[0].detail).toContain('payments')
     })
   })
+
+  // =========================================================================
+  // ATTACK 14: Keep the matcher, change what it checks (#73)
+  // Strategy: rather than downgrading a matcher, edit its arguments, the
+  // expect() input, a .not modifier, an it.each row, or a shared constant
+  // until the buggy implementation passes. Strength ranking sees no change.
+  // =========================================================================
+  describe('ATTACK: Edit assertion arguments instead of matchers', () => {
+    const cases: Array<[string, string, string]> = [
+      ['expected value changed to match the bug', `expect(tax(100)).toBe(8.25)`, `expect(tax(100)).toBe(8)`],
+      ['toBeCloseTo precision loosened', `expect(f()).toBeCloseTo(3.14159, 5)`, `expect(f()).toBeCloseTo(3.14159, 1)`],
+      ['numeric bound widened', `expect(ms).toBeLessThan(50)`, `expect(ms).toBeLessThan(5000)`],
+      ['.not flip to a trivially true negation', `expect(r).toBe(5)`, `expect(r).not.toBe(0)`],
+      ['error message requirement dropped', `expect(() => f()).toThrow('Invalid amount')`, `expect(() => f()).toThrow()`],
+      ['regex loosened', `expect(s).toMatch(/^\\d{3}-\\d{4}$/)`, `expect(s).toMatch(/\\d/)`],
+      ['input swapped for an easy case', `expect(parse('1,234.5')).toBe(1234.5)`, `expect(parse('1234.5')).toBe(1234.5)`],
+    ]
+
+    for (const [name, beforeAssertion, afterAssertion] of cases) {
+      it(`FIXED: ${name}`, () => {
+        const before = `it('checks', () => { ${beforeAssertion} })`
+        const after = `it('checks', () => { ${afterAssertion} })`
+        const violations = detectWeakeningInDiff(before, after, 'test.ts')
+        expect(violations.some(v => v.pattern === 'assertion-changed')).toBe(true)
+      })
+    }
+
+    it('FIXED: input edited in a local variable instead of inside expect()', () => {
+      const before = `it('parses', () => { const input = '1,234.5'; expect(parse(input)).toBe(1234.5) })`
+      const after = `it('parses', () => { const input = '1234.5'; expect(parse(input)).toBe(1234.5) })`
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'test-body-changed')).toBe(true)
+    })
+
+    it('FIXED: expected value edited in an it.each table row', () => {
+      const before = `it.each([[100, 8.25], [200, 16.5]])('tax %i', (a, b) => { expect(tax(a)).toBe(b) })`
+      const after = `it.each([[100, 8], [200, 16.5]])('tax %i', (a, b) => { expect(tax(a)).toBe(b) })`
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'test-body-changed')).toBe(true)
+    })
+
+    it('FIXED: expected value edited in a shared top-level constant', () => {
+      const before = `const EXPECTED = 8.25\nit('taxes', () => { expect(tax(100)).toBe(EXPECTED) })`
+      const after = `const EXPECTED = 8\nit('taxes', () => { expect(tax(100)).toBe(EXPECTED) })`
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'setup-changed')).toBe(true)
+    })
+  })
 })
