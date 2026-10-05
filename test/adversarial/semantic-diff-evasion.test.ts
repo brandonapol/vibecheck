@@ -502,4 +502,36 @@ describe('Semantic Diff Evasion Attacks', () => {
       expect(violations.some(v => v.pattern === 'setup-changed')).toBe(true)
     })
   })
+
+  // =========================================================================
+  // ATTACK 15: Keep the assertion byte-for-byte, make it unable to fail (#74)
+  // Strategy: wrap it in a swallowing try/catch or an if guard, or write a new
+  // test that compares a value to itself.
+  // =========================================================================
+  describe('ATTACK: Neutralize assertions with control flow', () => {
+    it('FIXED: new test with an assertion inside a swallowing try/catch', () => {
+      const after = `it('works', () => { try { expect(f()).toBe(1) } catch {} })`
+      const violations = detectWeakeningInDiff('', after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'assertion-neutralized')).toBe(true)
+    })
+
+    it('FIXED: new test with its only assertion behind an if guard', () => {
+      const after = `it('works', () => { const r = f(); if (r !== undefined) expect(r).toBe(1) })`
+      const violations = detectWeakeningInDiff('', after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'assertion-neutralized')).toBe(true)
+    })
+
+    it('FIXED: new test comparing a value to itself', () => {
+      const after = `it('works', () => { const r = f(); expect(r).toBe(r) })`
+      const violations = detectWeakeningInDiff('', after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'tautological-assertion')).toBe(true)
+    })
+
+    it('FIXED: existing assertion wrapped in try/catch is labeled as neutralized', () => {
+      const before = `it('works', () => { expect(f()).toBe(1) })`
+      const after = `it('works', () => { try { expect(f()).toBe(1) } catch {} })`
+      const violations = detectWeakeningInDiff(before, after, 'test.ts')
+      expect(violations.some(v => v.pattern === 'assertion-neutralized')).toBe(true)
+    })
+  })
 })

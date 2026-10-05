@@ -724,3 +724,55 @@ describe('detectWeakeningInDiff — setup-changed', () => {
     expect(detectWeakeningInDiff(before, after, 'helpers.test.ts')).toHaveLength(0)
   })
 })
+
+describe('detectWeakeningInDiff — assertion-neutralized', () => {
+  it('flags an existing assertion wrapped in a swallowing try/catch', () => {
+    const before = `it('t', () => { expect(f()).toBe(1) })`
+    const after = `it('t', () => { try { expect(f()).toBe(1) } catch {} })`
+    const neutralized = detectWeakeningInDiff(before, after, 'try.test.ts').filter(
+      v => v.pattern === 'assertion-neutralized',
+    )
+    expect(neutralized).toHaveLength(1)
+    expect(neutralized[0].detail).toContain('expect(f()).toBe(1)')
+  })
+
+  it('flags an existing assertion moved behind an if guard', () => {
+    const before = `it('t', () => { const r = f(); expect(r).toBe(1) })`
+    const after = `it('t', () => { const r = f(); if (r !== undefined) expect(r).toBe(1) })`
+    const violations = detectWeakeningInDiff(before, after, 'if.test.ts')
+    expect(violations.some(v => v.pattern === 'assertion-neutralized')).toBe(true)
+  })
+
+  it('does not flag an assertion that was already conditional on base', () => {
+    const code = `it('t', () => { for (const c of cases) expect(f(c)).toBe(1) })`
+    const before = code
+    const after = `it('t', () => { for (const c of cases) expect(f(c)).toBe(1); expect(g()).toBe(2) })`
+    const violations = detectWeakeningInDiff(before, after, 'loop.test.ts')
+    expect(violations.some(v => v.pattern === 'assertion-neutralized')).toBe(false)
+  })
+
+  it('does not flag a try whose catch rethrows', () => {
+    const before = `it('t', () => { expect(f()).toBe(1) })`
+    const after = `it('t', () => { try { expect(f()).toBe(1) } catch (e) { throw e } })`
+    const violations = detectWeakeningInDiff(before, after, 'rethrow.test.ts')
+    expect(violations.some(v => v.pattern === 'assertion-neutralized')).toBe(false)
+  })
+
+  it('flags a new test whose assertions are all conditional', () => {
+    const after = `it('t', () => { const r = f(); if (r) expect(r).toBe(1) })`
+    const violations = detectWeakeningInDiff('', after, 'new.test.ts')
+    expect(violations.some(v => v.pattern === 'assertion-neutralized')).toBe(true)
+  })
+
+  it('does not flag a new test with at least one unconditional assertion', () => {
+    const after = `it('t', () => { const r = f(); expect(r).toBeTruthy(); if (r) expect(r.id).toBe(1) })`
+    const violations = detectWeakeningInDiff('', after, 'mixed.test.ts')
+    expect(violations.some(v => v.pattern === 'assertion-neutralized')).toBe(false)
+  })
+
+  it('reports a self-comparison in a new test as tautological', () => {
+    const after = `it('t', () => { const r = f(); expect(r).toBe(r) })`
+    const violations = detectWeakeningInDiff('', after, 'self.test.ts')
+    expect(violations.some(v => v.pattern === 'tautological-assertion')).toBe(true)
+  })
+})

@@ -532,3 +532,76 @@ describe('extractSetup', () => {
     expect(a.key).not.toBe(b.key)
   })
 })
+
+describe('extractTests — self-comparison tautologies', () => {
+  function tautological(body: string): boolean {
+    return extractTests(`it('t', () => { ${body} })`)[0].assertions[0].tautological
+  }
+
+  it('marks a variable compared to itself as tautological', () => {
+    expect(tautological(`const r = f(); expect(r).toBe(r)`)).toBe(true)
+  })
+
+  it('marks a member path compared to itself as tautological', () => {
+    expect(tautological(`expect(a.b).toEqual(a.b)`)).toBe(true)
+  })
+
+  it('does not mark a repeated call as tautological (singleton/memoization checks)', () => {
+    expect(tautological(`expect(getInstance()).toBe(getInstance())`)).toBe(false)
+  })
+
+  it('does not mark a negated self-comparison as tautological', () => {
+    expect(tautological(`expect(r).not.toBe(r)`)).toBe(false)
+  })
+})
+
+describe('extractTests — conditional assertions', () => {
+  function conditional(body: string): boolean[] {
+    return extractTests(`it('t', () => { ${body} })`)[0].assertions.map(a => a.conditional)
+  }
+
+  it('treats top-level assertions as unconditional', () => {
+    expect(conditional(`expect(f()).toBe(1)`)).toEqual([false])
+  })
+
+  it('treats assertions in if branches as conditional', () => {
+    expect(conditional(`if (r !== undefined) expect(r).toBe(1); else expect(r).toBe(2)`)).toEqual([true, true])
+  })
+
+  it('treats assertions in ternaries and logical right-hand sides as conditional', () => {
+    expect(conditional(`r ? expect(r).toBe(1) : null; r && expect(r).toBe(2)`)).toEqual([true, true])
+  })
+
+  it('treats assertions in switch cases as conditional', () => {
+    expect(conditional(`switch (k) { case 1: expect(k).toBe(1) }`)).toEqual([true])
+  })
+
+  it('treats assertions in a try with a swallowing catch as conditional', () => {
+    expect(conditional(`try { expect(f()).toBe(1) } catch {}`)).toEqual([true])
+  })
+
+  it('treats assertions in a try whose catch rethrows as unconditional', () => {
+    expect(conditional(`try { expect(f()).toBe(1) } catch (e) { cleanup(); throw e }`)).toEqual([false])
+  })
+
+  it('treats assertions in a catch block as conditional', () => {
+    expect(conditional(`try { f() } catch (e) { expect(e.message).toBe('bad') }`)).toEqual([true])
+  })
+
+  it('treats assertions in finally as unconditional', () => {
+    expect(conditional(`try { f() } finally { expect(done).toBe(true) }`)).toEqual([false])
+  })
+
+  it('treats assertions in loops over unknown collections as conditional', () => {
+    expect(conditional(`for (const c of cases) expect(f(c)).toBe(1)`)).toEqual([true])
+    expect(conditional(`while (more()) expect(next()).toBe(1)`)).toEqual([true])
+  })
+
+  it('treats a for-of over a non-empty array literal as unconditional', () => {
+    expect(conditional(`for (const c of [1, 2]) expect(f(c)).toBe(1)`)).toEqual([false])
+  })
+
+  it('treats toThrow on a callback as unconditional', () => {
+    expect(conditional(`expect(() => f()).toThrow('bad')`)).toEqual([false])
+  })
+})
