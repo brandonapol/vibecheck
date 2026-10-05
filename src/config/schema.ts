@@ -18,6 +18,12 @@ const weakeningPattern = z.enum([
   'test-deletion',
   'skip-addition',
   'assertion-count-reduction',
+  'tautological-assertion',
+  'weak-new-test',
+  'suspicious-assertion',
+  'assertion-changed',
+  'test-body-changed',
+  'setup-changed',
 ])
 
 const semanticDiffSchema = z
@@ -32,6 +38,12 @@ const semanticDiffSchema = z
         'test-deletion',
         'skip-addition',
         'assertion-count-reduction',
+        'tautological-assertion',
+        'weak-new-test',
+        'suspicious-assertion',
+        'assertion-changed',
+        'test-body-changed',
+        'setup-changed',
       ]),
     enforcement: z.enum(['block', 'warn', 'comment']).default('block'),
   })

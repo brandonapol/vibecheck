@@ -4,6 +4,10 @@ export type ExtractedAssertion = {
   matcher: string
   modifiers: string[]
   tautological: boolean
+  hasArguments: boolean
+  /** Structural fingerprint of the whole chain; equal across formatting changes. */
+  key: string
+  source: string
 }
 
 export type ExtractedTest = {
@@ -13,6 +17,14 @@ export type ExtractedTest = {
   skipped: boolean
   assertions: ExtractedAssertion[]
   suspicious: string[]
+  /** Fingerprint of the body and any `.each` table, with assertions removed. */
+  bodyKey: string
+}
+
+/** A non-test statement at file or describe level (consts, helpers, hooks). */
+export type SetupStatement = {
+  key: string
+  source: string
 }
 
 type Node = {
@@ -48,6 +60,58 @@ function childNodes(node: Node): Node[] {
     }
   }
   return children
+}
+
+const NON_STRUCTURAL_KEYS = new Set([
+  'start', 'end', 'loc', 'range', 'extra',
+  'leadingComments', 'trailingComments', 'innerComments', 'comments',
+])
+
+/** Returns a substitute fingerprint for a node, null to drop it, or undefined
+ *  to fingerprint it normally. */
+type Replacer = (node: Node) => string | null | undefined
+
+/** `{ total: 1 }` and `{ "total": 1 }` are the same object: print a
+ *  non-computed identifier key as a string literal. */
+function normalizePropertyKey(node: Node, key: string): unknown {
+  const value = node[key]
+  const isPropertyKey =
+    key === 'key' &&
+    !node.computed &&
+    (node.type === 'ObjectProperty' || node.type === 'ObjectMethod') &&
+    isNode(value) &&
+    value.type === 'Identifier'
+  return isPropertyKey ? { type: 'StringLiteral', value: (value as Node).name } : value
+}
+
+/** Serialize AST shape, ignoring locations, comments, and raw text (quote
+ *  style, numeric spelling), so reformatting yields the same fingerprint. */
+function fingerprint(value: unknown, replace?: Replacer): string {
+  if (Array.isArray(value)) {
+    const items: string[] = []
+    for (const item of value) {
+      const printed = isNode(item) && replace ? replace(item) : undefined
+      if (printed === null) continue
+      items.push(printed ?? fingerprint(item, replace))
+    }
+    return '[' + items.join(',') + ']'
+  }
+  if (isNode(value)) {
+    const replaced = replace?.(value)
+    if (replaced === null) return 'null'
+    if (replaced !== undefined) return replaced
+    const fields: string[] = []
+    for (const key of Object.keys(value).sort()) {
+      if (NON_STRUCTURAL_KEYS.has(key)) continue
+      fields.push(key + ':' + fingerprint(normalizePropertyKey(value, key), replace))
+    }
+    return '{' + fields.join(',') + '}'
+  }
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return '{' + Object.keys(record).sort().map(k => k + ':' + fingerprint(record[k], replace)).join(',') + '}'
+  }
+  return JSON.stringify(value) ?? 'undefined'
 }
 
 function sliceSource(source: string, node: Node): string {
@@ -107,6 +171,22 @@ function resolveCallee(callee: Node): CalleeInfo | null {
     }
     return null
   }
+}
+
+/** Arguments of calls inside a registration callee, e.g. the table in
+ *  `it.each(table)` or the condition in `it.skipIf(cond)`. */
+function calleeCallArgs(callee: Node): Node[] {
+  const args: Node[] = []
+  let current: Node = callee
+  while (current.type === 'CallExpression' || current.type === 'MemberExpression') {
+    if (current.type === 'CallExpression') {
+      args.unshift(...(current.arguments as Node[]))
+      current = current.callee as Node
+    } else {
+      current = current.object as Node
+    }
+  }
+  return args
 }
 
 type Registration = {
@@ -192,7 +272,7 @@ function scanBody(node: Node, source: string, out: BodyScan): void {
           return
         }
       } else {
-        const chain = collectExpectChain(node)
+        const chain = collectExpectChain(node, source)
         if (chain) {
           out.assertions.push(chain.assertion)
           // Scan the expect() argument and the matcher arguments for nested chains.
@@ -214,7 +294,7 @@ type ChainResult = {
 
 /** If `call` is the outermost call of an expect chain
  *  (`expect(x).not.toBe(1)`, `expect.soft(x).toEqual(y)`, ...), extract it. */
-function collectExpectChain(call: Node): ChainResult | null {
+function collectExpectChain(call: Node, source: string): ChainResult | null {
   const callee = call.callee as Node
   if (callee.type !== 'MemberExpression' || callee.computed) return null
 
@@ -249,9 +329,36 @@ function collectExpectChain(call: Node): ChainResult | null {
     isLiteralValue(matcherArg)
 
   return {
-    assertion: { matcher, modifiers: allModifiers, tautological },
+    assertion: {
+      matcher,
+      modifiers: allModifiers,
+      tautological,
+      hasArguments: (call.arguments as Node[]).length > 0,
+      key: fingerprint(call),
+      source: sliceSource(source, call),
+    },
     innerArgs: root.args,
   }
+}
+
+function isAssertionCall(node: Node): boolean {
+  if (node.type !== 'CallExpression') return false
+  const callee = node.callee as Node
+  if (callee.type !== 'MemberExpression') return false
+  if (callee.computed) return containsExpectCall(callee.object as Node)
+  return collectExpectChain(node, '') !== null
+}
+
+/** Drops assertion statements and masks inline assertions, so the body
+ *  fingerprint only reflects setup, inputs, and control flow. */
+const stripAssertions: Replacer = node => {
+  if (node.type === 'ExpressionStatement') {
+    let expression = node.expression as Node
+    if (expression.type === 'AwaitExpression') expression = expression.argument as Node
+    if (isAssertionCall(expression)) return null
+  }
+  if (isAssertionCall(node)) return '<assertion>'
+  return undefined
 }
 
 function walk(
@@ -278,6 +385,7 @@ function walk(
 
         const scan: BodyScan = { assertions: [], suspicious: [] }
         if (body) scanBody(body, source, scan)
+        const table = calleeCallArgs(node.callee as Node)
         tests.push({
           name,
           describePath: [...describePath],
@@ -285,6 +393,7 @@ function walk(
           skipped,
           assertions: scan.assertions,
           suspicious: scan.suspicious,
+          bodyKey: fingerprint([table, args.slice(1)], stripAssertions),
         })
         return
       }
@@ -296,16 +405,57 @@ function walk(
   }
 }
 
-export function extractTests(source: string): ExtractedTest[] {
-  if (source.trim() === '') return []
-
+function parseProgram(source: string): Node {
   const ast = parse(source, {
     sourceType: 'unambiguous',
     errorRecovery: true,
     plugins: ['typescript', 'jsx'],
   })
+  return ast.program as unknown as Node
+}
+
+export function extractTests(source: string): ExtractedTest[] {
+  if (source.trim() === '') return []
 
   const tests: ExtractedTest[] = []
-  walk(ast.program as unknown as Node, source, [], false, tests)
+  walk(parseProgram(source), source, [], false, tests)
   return tests
+}
+
+/** Tests nested inside setup code (e.g. a loop) are compared on their own. */
+const maskRegistrations: Replacer = node => {
+  if (node.type === 'CallExpression' && classifyRegistration(node.callee as Node)) return '<registration>'
+  return undefined
+}
+
+function collectSetup(statements: Node[], source: string, out: SetupStatement[]): void {
+  for (const statement of statements) {
+    if (statement.type === 'ImportDeclaration') continue
+
+    const expression = statement.type === 'ExpressionStatement' ? (statement.expression as Node) : null
+    const registration =
+      expression?.type === 'CallExpression' ? classifyRegistration(expression.callee as Node) : null
+
+    if (expression && registration) {
+      const table = calleeCallArgs(expression.callee as Node)
+      if (table.length > 0) {
+        out.push({ key: fingerprint(table), source: sliceSource(source, expression.callee as Node) })
+      }
+      const body = (expression.arguments as Node[])[1]
+      if (registration.kind === 'describe' && body && (body.body as Node | undefined)?.type === 'BlockStatement') {
+        collectSetup((body.body as Node).body as Node[], source, out)
+      }
+      continue
+    }
+
+    out.push({ key: fingerprint(statement, maskRegistrations), source: sliceSource(source, statement) })
+  }
+}
+
+export function extractSetup(source: string): SetupStatement[] {
+  if (source.trim() === '') return []
+
+  const setup: SetupStatement[] = []
+  collectSetup(parseProgram(source).body as Node[], source, setup)
+  return setup
 }
