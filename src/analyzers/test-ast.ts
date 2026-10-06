@@ -4,6 +4,8 @@ export type ExtractedAssertion = {
   matcher: string
   modifiers: string[]
   tautological: boolean
+  /** Inside a branch, loop, or swallowing try, so it may never run. */
+  conditional: boolean
   hasArguments: boolean
   /** Structural fingerprint of the whole chain; equal across formatting changes. */
   key: string
@@ -223,6 +225,16 @@ function isLiteralValue(node: Node): boolean {
   }
 }
 
+/** `r`, `this.x`, `a.b['c']`: comparing one to itself always passes. Calls are
+ *  excluded so `expect(getInstance()).toBe(getInstance())` stays a real check. */
+function isSideEffectFreePath(node: Node): boolean {
+  if (node.type === 'Identifier' || node.type === 'ThisExpression') return true
+  if (node.type !== 'MemberExpression') return false
+  const property = node.property as Node
+  if (node.computed && property.type !== 'StringLiteral' && property.type !== 'NumericLiteral') return false
+  return isSideEffectFreePath(node.object as Node)
+}
+
 /** Root of an assertion chain: `expect(...)` or `expect.soft(...)`.
  *  Returns the expect call's arguments plus any root modifier, or null. */
 function resolveExpectRoot(node: Node): { args: Node[]; modifiers: string[] } | null {
@@ -254,9 +266,48 @@ type BodyScan = {
   suspicious: string[]
 }
 
+function containsThrow(node: Node): boolean {
+  if (node.type === 'ThrowStatement') return true
+  return childNodes(node).some(containsThrow)
+}
+
+function isNonEmptyArrayLiteral(node: Node): boolean {
+  return node.type === 'ArrayExpression' && (node.elements as unknown[]).length > 0
+}
+
+/** Children of a control-flow node, each paired with whether code there may
+ *  not run. Returns null for nodes that don't introduce conditionality. */
+function controlFlowChildren(node: Node, conditional: boolean): Array<[Node | null, boolean]> | null {
+  switch (node.type) {
+    case 'IfStatement':
+      return [[node.test as Node, conditional], [node.consequent as Node, true], [node.alternate as Node | null, true]]
+    case 'ConditionalExpression':
+      return [[node.test as Node, conditional], [node.consequent as Node, true], [node.alternate as Node, true]]
+    case 'LogicalExpression':
+      return [[node.left as Node, conditional], [node.right as Node, true]]
+    case 'SwitchStatement':
+      return [[node.discriminant as Node, conditional], ...(node.cases as Node[]).map(c => [c, true] as [Node, boolean])]
+    case 'WhileStatement':
+    case 'ForStatement':
+    case 'ForInStatement':
+      return childNodes(node).map(child => [child, child === node.body ? true : conditional])
+    case 'ForOfStatement': {
+      const bodyRuns = isNonEmptyArrayLiteral(node.right as Node)
+      return childNodes(node).map(child => [child, child === node.body && !bodyRuns ? true : conditional])
+    }
+    case 'TryStatement': {
+      const handler = node.handler as Node | null
+      const swallows = handler !== null && !containsThrow(handler)
+      return [[node.block as Node, conditional || swallows], [handler, true], [node.finalizer as Node | null, conditional]]
+    }
+    default:
+      return null
+  }
+}
+
 /** Walk a test body collecting assertion chains rooted at expect()/expect.soft().
  *  Computed member access over an expect chain is recorded as suspicious. */
-function scanBody(node: Node, source: string, out: BodyScan): void {
+function scanBody(node: Node, source: string, out: BodyScan, conditional = false): void {
   if (node.type === 'CallExpression') {
     const callee = node.callee as Node
 
@@ -267,24 +318,32 @@ function scanBody(node: Node, source: string, out: BodyScan): void {
             `dynamic assertion call: ${sliceSource(source, node)}`,
           )
           // Still scan the expect() receiver's arguments, then stop.
-          scanBody(callee.object as Node, source, out)
-          for (const arg of node.arguments as Node[]) scanBody(arg, source, out)
+          scanBody(callee.object as Node, source, out, conditional)
+          for (const arg of node.arguments as Node[]) scanBody(arg, source, out, conditional)
           return
         }
       } else {
         const chain = collectExpectChain(node, source)
         if (chain) {
-          out.assertions.push(chain.assertion)
+          out.assertions.push({ ...chain.assertion, conditional })
           // Scan the expect() argument and the matcher arguments for nested chains.
-          for (const arg of chain.innerArgs) scanBody(arg, source, out)
-          for (const arg of node.arguments as Node[]) scanBody(arg, source, out)
+          for (const arg of chain.innerArgs) scanBody(arg, source, out, conditional)
+          for (const arg of node.arguments as Node[]) scanBody(arg, source, out, conditional)
           return
         }
       }
     }
   }
 
-  for (const child of childNodes(node)) scanBody(child, source, out)
+  const branches = controlFlowChildren(node, conditional)
+  if (branches) {
+    for (const [child, childConditional] of branches) {
+      if (child) scanBody(child, source, out, childConditional)
+    }
+    return
+  }
+
+  for (const child of childNodes(node)) scanBody(child, source, out, conditional)
 }
 
 type ChainResult = {
@@ -324,15 +383,16 @@ function collectExpectChain(call: Node, source: string): ChainResult | null {
     TAUTOLOGY_MATCHERS.has(matcher) &&
     allModifiers.length === 0 &&
     expectArg !== undefined &&
-    isLiteralValue(expectArg) &&
     matcherArg !== undefined &&
-    isLiteralValue(matcherArg)
+    ((isLiteralValue(expectArg) && isLiteralValue(matcherArg)) ||
+      (isSideEffectFreePath(expectArg) && fingerprint(expectArg) === fingerprint(matcherArg)))
 
   return {
     assertion: {
       matcher,
       modifiers: allModifiers,
       tautological,
+      conditional: false,
       hasArguments: (call.arguments as Node[]).length > 0,
       key: fingerprint(call),
       source: sliceSource(source, call),
