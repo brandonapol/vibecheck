@@ -12,6 +12,7 @@ export type InitResult = {
 const CONFIG_TEMPLATE = `import { defineConfig } from 'vibecheck-tdd'
 
 export default defineConfig({
+  threshold: 80,
   mutation: {
     enabled: true,
     tool: 'stryker',

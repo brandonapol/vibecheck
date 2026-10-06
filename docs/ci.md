@@ -49,7 +49,7 @@ jobs:
     uses: your-org/vibecheck/.github/workflows/vibecheck.yml@main
     with:
       protected-branch: main
-      mutation-threshold: 80
+      threshold: 80
       node-version: '20'
 ```
 
@@ -58,7 +58,7 @@ jobs:
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
 | `protected-branch` | `string` | `'main'` | Branch to compare for semantic diff |
-| `mutation-threshold` | `number` | `80` | Minimum mutation score |
+| `threshold` | `number` | `80` | Minimum composite integrity score. The mutation score is gated separately by `mutation.threshold` in `vibecheck.config.ts`. |
 | `node-version` | `string` | `'20'` | Node.js version |
 
 #### Secrets

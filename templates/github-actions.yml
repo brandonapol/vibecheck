@@ -8,8 +8,8 @@ on:
         required: false
         type: string
         default: 'main'
-      mutation-threshold:
-        description: 'Minimum mutation score (0-100)'
+      threshold:
+        description: 'Minimum composite integrity score (0-100); mutation.threshold in vibecheck.config.ts gates the mutation score'
         required: false
         type: number
         default: 80
@@ -40,4 +40,4 @@ jobs:
       - run: npm ci
 
       - name: Run vibecheck
-        run: npx vibecheck check --threshold ${{ inputs.mutation-threshold }}
+        run: npx vibecheck check --threshold ${{ inputs.threshold }}

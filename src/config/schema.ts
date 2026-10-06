@@ -117,6 +117,10 @@ export const configSchema = z.object({
 
   protectedBranch: z.string().default('main'),
 
+  // Minimum composite integrity score (0-100). Gates the score only; each
+  // analyzer keeps its own threshold.
+  threshold: z.number().min(0).max(100).default(80),
+
   agentTrailers: z
     .array(z.string())
     .default([

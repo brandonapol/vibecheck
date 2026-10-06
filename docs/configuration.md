@@ -18,6 +18,9 @@ export default defineConfig({
   // Branch to compare against for semantic diff and protection checks
   protectedBranch: 'main',
 
+  // Minimum composite integrity score; see Scoring for the other gates
+  threshold: 80,
+
   // Mutation testing configuration
   mutation: {
     enabled: true,
@@ -34,7 +37,7 @@ export default defineConfig({
   // Semantic diff analysis configuration
   semanticDiff: {
     enabled: true,
-    enforcement: 'block',     // 'block' | 'warn' | 'comment'
+    enforcement: 'block',     // 'block' fails on any violation; 'warn' | 'comment' only report
     patterns: [               // Which weakening patterns to detect
       'precision-reduction',
       'error-relaxation',
@@ -81,7 +84,7 @@ export default defineConfig({
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enabled` | `boolean` | `true` | Enable semantic diff analysis |
-| `enforcement` | `'block' \| 'warn' \| 'comment'` | `'block'` | How to handle violations |
+| `enforcement` | `'block' \| 'warn' \| 'comment'` | `'block'` | `'block'` fails the check on any violation, whatever the score; `'warn'` and `'comment'` report without failing |
 | `patterns` | `string[]` | all patterns | Which weakening patterns to detect |
 
 ## Hidden Tests

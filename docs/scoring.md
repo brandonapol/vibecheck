@@ -29,23 +29,31 @@ If all analyzers are disabled, the score is **0** (not 100). This prevents an ag
 
 If only one analyzer is enabled, the total score equals that analyzer's score. For example, with only mutation testing enabled at 85%, the total is 85.
 
-## Pass/Fail Threshold
+## Pass/Fail
 
-The default threshold is **80**. A score at or above the threshold passes; below fails.
+The composite score is a quality signal, not the only gate. A check passes only when all of these hold:
 
-Override it per-run:
+1. **Composite score** ≥ `threshold` (default **80**).
+2. **Mutation score** ≥ `mutation.threshold`, and every file ≥ `mutation.perFileThreshold`, when mutation analysis is enabled.
+3. **No semantic diff violations** when `semanticDiff.enforcement` is `'block'` (the default). Semantic diff carries only 10 of the score's weight, so at a perfect mutation score even unlimited weakening would still score 80. The gate is what stops it. Under `'warn'` or `'comment'`, violations are reported but don't fail the check.
+
+Only violations of patterns listed in `semanticDiff.patterns` count, toward the score or the gate. The report lists every failed gate under **Blocking**.
+
+```typescript
+export default defineConfig({
+  threshold: 80,            // composite score
+  mutation: {
+    threshold: 80,          // overall mutation score
+    perFileThreshold: 60,   // every mutated file
+  },
+  semanticDiff: { enforcement: 'block' },
+})
+```
+
+`--threshold` overrides the composite threshold for one run:
 
 ```bash
 npx vibecheck check --threshold 90
-```
-
-Or in configuration:
-
-```typescript
-mutation: {
-  threshold: 80,          // Per-analyzer threshold
-  perFileThreshold: 60,   // Per-file minimum
-}
 ```
 
 ## Component Breakdown

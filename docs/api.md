@@ -171,7 +171,7 @@ Check whether mutation scores meet the configured thresholds.
 
 ### `runCheck(config, inputs)`
 
-Run the full vibecheck pipeline: scoring, threshold checking, and report generation.
+Run the full vibecheck pipeline: scoring, the pass/fail gates (see [Scoring](scoring.md#passfail)), and report generation.
 
 ```typescript
 import { runCheck } from 'vibecheck-tdd'
@@ -183,8 +183,9 @@ const result = await runCheck(config, {
   semanticViolations: [],
 })
 
-console.log(result.pass)    // true
-console.log(result.score)   // { total: 87, components: { ... } }
+console.log(result.pass)      // true
+console.log(result.score)     // { total: 88, components: { ... } }
+console.log(result.failures)  // [] — one line per failed gate otherwise
 console.log(result.report)  // formatted string
 ```
 

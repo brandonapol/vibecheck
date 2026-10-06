@@ -4,7 +4,12 @@ import type { WeakeningViolation } from '../analyzers/semantic-diff.js'
 
 type ReportDetails = {
   mutation?: MutationReport
+  /** Shown on the mutation line; defaults to the composite threshold. */
+  mutationThreshold?: number
   semanticDiff?: WeakeningViolation[]
+  /** The overall verdict when gates other than the score decide it. */
+  pass?: boolean
+  failures?: string[]
 }
 
 export function formatReport(
@@ -13,13 +18,13 @@ export function formatReport(
   details: ReportDetails,
 ): string {
   const lines: string[] = []
-  const status = score.total >= threshold ? 'PASS' : 'FAIL'
+  const status = (details.pass ?? score.total >= threshold) ? 'PASS' : 'FAIL'
 
   lines.push(`vibecheck: Test Integrity Score — ${score.total}/100 (threshold: ${threshold}) ${status}`)
   lines.push('')
 
   if (score.components.mutation !== undefined) {
-    lines.push(`  Mutation Score:       ${score.components.mutation}% (threshold: ${threshold})`)
+    lines.push(`  Mutation Score:       ${score.components.mutation}% (threshold: ${details.mutationThreshold ?? threshold})`)
   }
 
   if (score.components.semanticDiff !== undefined) {
@@ -48,6 +53,14 @@ export function formatReport(
     lines.push('  Assertion weakening detected:')
     for (const v of details.semanticDiff) {
       lines.push(`    ${v.file} — ${v.pattern}: ${v.detail}`)
+    }
+  }
+
+  if (details.failures && details.failures.length > 0) {
+    lines.push('')
+    lines.push('  Blocking:')
+    for (const failure of details.failures) {
+      lines.push(`    ${failure}`)
     }
   }
 
