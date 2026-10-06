@@ -17,6 +17,8 @@ export type { ExtractedTest, ExtractedAssertion, SetupStatement } from './analyz
 export { registerAdapter, getAdapter, resolveLanguages, languageForFile } from './languages/registry.js'
 export { runMutationForLanguages } from './languages/mutation.js'
 export { typescriptAdapter } from './languages/typescript.js'
+export { goAdapter, createGoAdapter, GO_ASSERTION_STRENGTH } from './languages/go.js'
+export type { GoAdapterOptions } from './languages/go.js'
 export type { LanguageAdapter, ResolvedLanguage, MutationRunOptions } from './languages/types.js'
 export { formatReport } from './reporters/console.js'
 export { runCheck } from './cli/runner.js'
