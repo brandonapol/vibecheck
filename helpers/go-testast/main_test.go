@@ -348,3 +348,23 @@ func TestA(t *testing.T) {}
 		t.Fatalf("setup = %+v", result.Setup)
 	}
 }
+
+func TestFailingOnEqualityOnlyAssertsADifference(t *testing.T) {
+	result := mustExtract(t, `package x
+import "testing"
+func TestNe(t *testing.T) {
+	if got == 0 { t.Fatal("x") }
+	if got != want {
+	} else {
+		t.Fatal("x")
+	}
+	if len(items) == 0 { t.Fatal("x") }
+	if reflect.DeepEqual(a, b) { t.Fatal("x") }
+	if got != want { t.Fatal("x") }
+}
+`)
+	want := "notEqual,notEqual,notEqual,notEqual,equal"
+	if got := strings.Join(matchers(findTest(t, result, "TestNe")), ","); got != want {
+		t.Fatalf("matchers = %s, want %s", got, want)
+	}
+}

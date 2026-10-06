@@ -101,6 +101,12 @@ describe.skipIf(!hasGo)('Go semantic diff evasion attacks (requires go)', () => 
     expect(await patterns(before, after)).toContain('assertion-changed')
   })
 
+  it('catches an equality check being flipped to only rule out one value', async () => {
+    const before = `func TestSum(t *testing.T) {\n\tif got := Sum(1, 2); got != 3 {\n\t\tt.Fatal("x")\n\t}\n}`
+    const after = `func TestSum(t *testing.T) {\n\tif got := Sum(1, 2); got == 0 {\n\t\tt.Fatal("x")\n\t}\n}`
+    expect(await patterns(before, after)).toContain('precision-reduction')
+  })
+
   it('catches an assertion moved behind a branch that may not run', async () => {
     const before = `func TestSum(t *testing.T) {\n\tif got := Sum(1, 2); got != 3 {\n\t\tt.Fatal("x")\n\t}\n}`
     const after = `func TestSum(t *testing.T) {\n\tif os.Getenv("CI") != "" {\n\t\tif got := Sum(1, 2); got != 3 {\n\t\t\tt.Fatal("x")\n\t\t}\n\t}\n}`

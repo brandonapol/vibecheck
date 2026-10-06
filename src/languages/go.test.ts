@@ -43,6 +43,7 @@ describe('goAdapter', () => {
     expect(goAdapter.assertionStrength('errorIs')).toBe(7)
     expect(goAdapter.assertionStrength('noError')).toBe(6)
     expect(goAdapter.assertionStrength('anyError')).toBe(4)
+    expect(goAdapter.assertionStrength('notEqual')).toBe(4)
     expect(goAdapter.assertionStrength('truthy')).toBe(3)
     expect(goAdapter.assertionStrength('notNil')).toBe(2)
   })
