@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractTests, type ExtractedTest } from './test-ast.js'
+import { extractTests, extractSetup, type ExtractedTest } from './test-ast.js'
 
 function byId(tests: ExtractedTest[], id: string): ExtractedTest | undefined {
   return tests.find(t => t.id === id)
@@ -405,5 +405,203 @@ describe('extractTests — comments and syntax', () => {
   it('returns an empty list for source with no tests', () => {
     expect(extractTests('const a = 1')).toEqual([])
     expect(extractTests('')).toEqual([])
+  })
+})
+
+describe('extractTests — structural assertion keys', () => {
+  function onlyAssertion(source: string) {
+    return extractTests(source)[0].assertions[0]
+  }
+
+  it('gives formatting-only variants the same key', () => {
+    const a = onlyAssertion(`it('t', () => { expect(sum([1, 2])).toEqual({ total: 3 }) })`)
+    const b = onlyAssertion(`
+      it('t', () => {
+        expect(
+          sum([1,2,]),
+        ).toEqual({ "total": 3, });
+      })
+    `)
+    expect(a.key).toBe(b.key)
+  })
+
+  it('treats single and double quoted strings as the same', () => {
+    const a = onlyAssertion(`it('t', () => { expect(f('x')).toBe('y') })`)
+    const b = onlyAssertion(`it('t', () => { expect(f("x")).toBe("y") })`)
+    expect(a.key).toBe(b.key)
+  })
+
+  it('changes the key when the expected value changes', () => {
+    const a = onlyAssertion(`it('t', () => { expect(tax(100)).toBe(8.25) })`)
+    const b = onlyAssertion(`it('t', () => { expect(tax(100)).toBe(8) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('changes the key when the expect argument changes', () => {
+    const a = onlyAssertion(`it('t', () => { expect(parse('1,234.5')).toBe(1234.5) })`)
+    const b = onlyAssertion(`it('t', () => { expect(parse('1234.5')).toBe(1234.5) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('changes the key when a matcher argument like precision changes', () => {
+    const a = onlyAssertion(`it('t', () => { expect(f()).toBeCloseTo(3.14159, 5) })`)
+    const b = onlyAssertion(`it('t', () => { expect(f()).toBeCloseTo(3.14159, 1) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('changes the key when .not is added', () => {
+    const a = onlyAssertion(`it('t', () => { expect(r).toBe(5) })`)
+    const b = onlyAssertion(`it('t', () => { expect(r).not.toBe(5) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('changes the key when a regex is loosened', () => {
+    const a = onlyAssertion(`it('t', () => { expect(s).toMatch(/^\\d{3}$/) })`)
+    const b = onlyAssertion(`it('t', () => { expect(s).toMatch(/\\d/) })`)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('exposes the original assertion source for reporting', () => {
+    const a = onlyAssertion(`it('t', () => { expect(tax(100)).toBe(8.25) })`)
+    expect(a.source).toBe('expect(tax(100)).toBe(8.25)')
+  })
+})
+
+describe('extractTests — body keys', () => {
+  function bodyKey(source: string): string {
+    return extractTests(source)[0].bodyKey
+  }
+
+  it('ignores formatting differences', () => {
+    expect(bodyKey(`it('t', () => { const input = 'a'; expect(f(input)).toBe(1) })`)).toBe(
+      bodyKey(`
+        it('t', () => {
+          const input = "a"
+          expect(f(input)).toBe(1)
+        })
+      `),
+    )
+  })
+
+  it('ignores added, removed, or changed assertions', () => {
+    expect(bodyKey(`it('t', () => { const x = f(); expect(x).toBe(1) })`)).toBe(
+      bodyKey(`it('t', () => { const x = f(); expect(x).toBe(2); expect(x).toBeDefined() })`),
+    )
+  })
+
+  it('changes when setup code inside the test changes', () => {
+    expect(bodyKey(`it('t', () => { const input = '1,234.5'; expect(parse(input)).toBe(1234.5) })`)).not.toBe(
+      bodyKey(`it('t', () => { const input = '1234.5'; expect(parse(input)).toBe(1234.5) })`),
+    )
+  })
+
+  it('changes when an it.each table changes', () => {
+    expect(bodyKey(`it.each([[100, 8.25]])('tax %i', (a, b) => { expect(tax(a)).toBe(b) })`)).not.toBe(
+      bodyKey(`it.each([[100, 8]])('tax %i', (a, b) => { expect(tax(a)).toBe(b) })`),
+    )
+  })
+})
+
+describe('extractSetup', () => {
+  it('collects top-level and describe-level statements that are not tests', () => {
+    const setup = extractSetup(`
+      import { f } from './f'
+      const EXPECTED = 8.25
+      describe('tax', () => {
+        beforeEach(() => { reset() })
+        it('t', () => { expect(f()).toBe(EXPECTED) })
+      })
+    `)
+    const sources = setup.map(s => s.source)
+    expect(sources).toContain('const EXPECTED = 8.25')
+    expect(sources.some(s => s.startsWith('beforeEach'))).toBe(true)
+    expect(sources.some(s => s.startsWith('import'))).toBe(false)
+    expect(sources.some(s => s.startsWith('it('))).toBe(false)
+    expect(sources.some(s => s.startsWith('describe('))).toBe(false)
+  })
+
+  it('gives formatting-only variants the same key', () => {
+    const [a] = extractSetup(`const EXPECTED = { rate: 'x' }`)
+    const [b] = extractSetup(`const EXPECTED = {\n  rate: "x",\n};`)
+    expect(a.key).toBe(b.key)
+  })
+
+  it('changes the key when a constant value changes', () => {
+    const [a] = extractSetup(`const EXPECTED = 8.25`)
+    const [b] = extractSetup(`const EXPECTED = 8`)
+    expect(a.key).not.toBe(b.key)
+  })
+})
+
+describe('extractTests — self-comparison tautologies', () => {
+  function tautological(body: string): boolean {
+    return extractTests(`it('t', () => { ${body} })`)[0].assertions[0].tautological
+  }
+
+  it('marks a variable compared to itself as tautological', () => {
+    expect(tautological(`const r = f(); expect(r).toBe(r)`)).toBe(true)
+  })
+
+  it('marks a member path compared to itself as tautological', () => {
+    expect(tautological(`expect(a.b).toEqual(a.b)`)).toBe(true)
+  })
+
+  it('does not mark a repeated call as tautological (singleton/memoization checks)', () => {
+    expect(tautological(`expect(getInstance()).toBe(getInstance())`)).toBe(false)
+  })
+
+  it('does not mark a negated self-comparison as tautological', () => {
+    expect(tautological(`expect(r).not.toBe(r)`)).toBe(false)
+  })
+})
+
+describe('extractTests — conditional assertions', () => {
+  function conditional(body: string): boolean[] {
+    return extractTests(`it('t', () => { ${body} })`)[0].assertions.map(a => a.conditional)
+  }
+
+  it('treats top-level assertions as unconditional', () => {
+    expect(conditional(`expect(f()).toBe(1)`)).toEqual([false])
+  })
+
+  it('treats assertions in if branches as conditional', () => {
+    expect(conditional(`if (r !== undefined) expect(r).toBe(1); else expect(r).toBe(2)`)).toEqual([true, true])
+  })
+
+  it('treats assertions in ternaries and logical right-hand sides as conditional', () => {
+    expect(conditional(`r ? expect(r).toBe(1) : null; r && expect(r).toBe(2)`)).toEqual([true, true])
+  })
+
+  it('treats assertions in switch cases as conditional', () => {
+    expect(conditional(`switch (k) { case 1: expect(k).toBe(1) }`)).toEqual([true])
+  })
+
+  it('treats assertions in a try with a swallowing catch as conditional', () => {
+    expect(conditional(`try { expect(f()).toBe(1) } catch {}`)).toEqual([true])
+  })
+
+  it('treats assertions in a try whose catch rethrows as unconditional', () => {
+    expect(conditional(`try { expect(f()).toBe(1) } catch (e) { cleanup(); throw e }`)).toEqual([false])
+  })
+
+  it('treats assertions in a catch block as conditional', () => {
+    expect(conditional(`try { f() } catch (e) { expect(e.message).toBe('bad') }`)).toEqual([true])
+  })
+
+  it('treats assertions in finally as unconditional', () => {
+    expect(conditional(`try { f() } finally { expect(done).toBe(true) }`)).toEqual([false])
+  })
+
+  it('treats assertions in loops over unknown collections as conditional', () => {
+    expect(conditional(`for (const c of cases) expect(f(c)).toBe(1)`)).toEqual([true])
+    expect(conditional(`while (more()) expect(next()).toBe(1)`)).toEqual([true])
+  })
+
+  it('treats a for-of over a non-empty array literal as unconditional', () => {
+    expect(conditional(`for (const c of [1, 2]) expect(f(c)).toBe(1)`)).toEqual([false])
+  })
+
+  it('treats toThrow on a callback as unconditional', () => {
+    expect(conditional(`expect(() => f()).toThrow('bad')`)).toEqual([false])
   })
 })

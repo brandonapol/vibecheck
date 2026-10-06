@@ -1,4 +1,4 @@
-import { extractTests, type ExtractedTest } from './test-ast.js'
+import { extractSetup, extractTests, type ExtractedAssertion, type ExtractedTest } from './test-ast.js'
 
 export type WeakeningPattern =
   | 'precision-reduction'
@@ -10,6 +10,10 @@ export type WeakeningPattern =
   | 'tautological-assertion'
   | 'weak-new-test'
   | 'suspicious-assertion'
+  | 'assertion-changed'
+  | 'test-body-changed'
+  | 'setup-changed'
+  | 'assertion-neutralized'
 
 export type WeakeningViolation = {
   file: string
@@ -76,6 +80,19 @@ function sortedMatchers(test: ExtractedTest): string[] {
 // additionally reported as a count reduction.
 function assertionCount(test: ExtractedTest): number {
   return test.assertions.length + test.suspicious.length
+}
+
+const SNIPPET_LIMIT = 120
+
+function snippet(source: string): string {
+  const flat = source.replace(/\s+/g, ' ').trim()
+  return flat.length > SNIPPET_LIMIT ? flat.slice(0, SNIPPET_LIMIT - 1) + '…' : flat
+}
+
+/** Removes and returns the first entry of `pool` whose key matches. */
+function takeByKey<T extends { key: string }>(pool: T[], key: string): T | undefined {
+  const index = pool.findIndex(item => item.key === key)
+  return index === -1 ? undefined : pool.splice(index, 1)[0]
 }
 
 type MatchedPair = { before: ExtractedTest; after: ExtractedTest }
@@ -159,6 +176,78 @@ function compareMatchedTest(
       })
     }
   }
+
+  reportChangedAssertions({ before, after }, file, violations)
+  reportNeutralizedAssertions({ before, after }, file, violations)
+
+  if (before.bodyKey !== after.bodyKey) {
+    violations.push({
+      file,
+      pattern: 'test-body-changed',
+      detail: `Test "${after.id}": setup or inputs changed outside the assertions`,
+    })
+  }
+}
+
+/** Any existing assertion without an exact structural match after the change
+ *  is reported. Exempt: tautologies and argument-less weak matchers
+ *  (`toBeDefined()`), which have nothing meaningful to loosen, and rewrites to
+ *  a weaker matcher, which precision-reduction already reports. */
+function reportChangedAssertions(
+  { before, after }: MatchedPair,
+  file: string,
+  violations: WeakeningViolation[],
+): void {
+  const unmatchedAfter: ExtractedAssertion[] = [...after.assertions]
+  const unmatchedBefore = before.assertions.filter(a => !takeByKey(unmatchedAfter, a.key))
+
+  for (const original of unmatchedBefore) {
+    if (original.tautological) continue
+    if (!original.hasArguments && strengthOf(original.matcher) <= WEAK_THRESHOLD) continue
+    const sameMatcher = unmatchedAfter.findIndex(a => a.matcher === original.matcher)
+    const partnerIndex = sameMatcher === -1 ? 0 : sameMatcher
+    const partner = unmatchedAfter.splice(partnerIndex, 1)[0]
+    if (partner && strengthOf(partner.matcher) < strengthOf(original.matcher)) continue
+    violations.push({
+      file,
+      pattern: 'assertion-changed',
+      detail: `Test "${after.id}": ${snippet(original.source)} → ${partner ? snippet(partner.source) : '(removed)'}`,
+    })
+  }
+}
+
+/** An assertion that always ran on base but can now be skipped by a branch,
+ *  loop, or swallowing try/catch. */
+function reportNeutralizedAssertions(
+  { before, after }: MatchedPair,
+  file: string,
+  violations: WeakeningViolation[],
+): void {
+  const unconditionalAfter = after.assertions.filter(a => !a.conditional)
+  const conditionalAfter = after.assertions.filter(a => a.conditional)
+
+  for (const original of before.assertions) {
+    if (original.conditional) continue
+    if (takeByKey(unconditionalAfter, original.key)) continue
+    if (!takeByKey(conditionalAfter, original.key)) continue
+    violations.push({
+      file,
+      pattern: 'assertion-neutralized',
+      detail: `Test "${after.id}": ${snippet(original.source)} now runs only conditionally`,
+    })
+  }
+}
+
+function reportSetupChanges(before: string, after: string, file: string, violations: WeakeningViolation[]): void {
+  const remaining = extractSetup(after)
+  for (const statement of extractSetup(before)) {
+    if (takeByKey(remaining, statement.key)) continue
+    violations.push({
+      file,
+      pattern: 'setup-changed',
+      detail: `Shared setup changed or removed: ${snippet(statement.source)}`,
+    })
+  }
 }
 
 function reportSuspicious(test: ExtractedTest, file: string, violations: WeakeningViolation[]): void {
@@ -198,6 +287,8 @@ export function detectWeakeningInDiff(
     })
   }
 
+  reportSetupChanges(before, after, file, violations)
+
   for (const pair of pairs) {
     compareMatchedTest(pair, file, violations)
     reportSuspicious(pair.after, file, violations)
@@ -209,6 +300,13 @@ export function detectWeakeningInDiff(
     reportTautologies(test, file, violations)
 
     if (test.assertions.length === 0) continue
+    if (test.assertions.every(a => a.conditional)) {
+      violations.push({
+        file,
+        pattern: 'assertion-neutralized',
+        detail: `Test "${test.id}": every assertion is behind a branch, loop, or swallowing try/catch`,
+      })
+    }
     const maxStrength = Math.max(...test.assertions.map(a => strengthOf(a.matcher)))
     if (maxStrength <= WEAK_THRESHOLD) {
       violations.push({
