@@ -268,4 +268,60 @@ void main() {
       expect((result['setup'] as List).length, 5);
     },
   );
+
+  group('found by running over a real codebase', () {
+    test(
+      'a collection or record built from computed values is not a tautology',
+      () {
+        final t = find(
+          extract('''
+void main() {
+  test('t', () {
+    expect([for (var r = 1; r < 3; r++) c.cellAt(r, 0)], ['a', 'b']);
+    expect((q.start, q.end), (3, 6));
+    expect({a.lane, b.lane}, {0, 1});
+    expect(-1, -1);
+  });
+}
+'''),
+          't',
+        );
+        expect(assertions(t).map((a) => a['tautological']).toList(), [
+          false,
+          false,
+          false,
+          true,
+        ]);
+      },
+    );
+
+    test(
+      'a constructed or computed expected value is equals, not a matcher',
+      () {
+        final t = find(
+          extract('''
+void main() {
+  test('t', () {
+    expect(d, DateTime(2024, 1, 2));
+    expect(v, const NumberValue(3));
+    expect(v, Foo.parse('1'));
+    expect(v, build(1));
+    expect(v, const TypeMatcher<Foo>());
+    expect(v, isA<Foo>().having((f) => f.id, 'id', 1));
+  });
+}
+'''),
+          't',
+        );
+        expect(matchers(t), [
+          'equals',
+          'equals',
+          'equals',
+          'equals',
+          'TypeMatcher',
+          'having',
+        ]);
+      },
+    );
+  });
 }

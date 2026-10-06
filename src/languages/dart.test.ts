@@ -43,6 +43,7 @@ describe('dartAdapter', () => {
     expect(dartAdapter.assertionStrength('findsWidgets')).toBe(3)
     expect(dartAdapter.assertionStrength('isNotNull')).toBe(2)
     expect(dartAdapter.assertionStrength('findsAny')).toBe(2)
+    expect(dartAdapter.assertionStrength('having')).toBe(7)
   })
 
   it('ranks finders from exact to loose', () => {
