@@ -5,6 +5,7 @@ import { runCheck } from '../src/cli/runner.js'
 import { scaffoldProject } from '../src/cli/init.js'
 import { loadConfig } from '../src/config/loader.js'
 import { resolveCheckConfig } from '../src/cli/config-source.js'
+import { checkProtectedTests, isProtectedTestFile, type ProtectedTestViolation } from '../src/analyzers/protected-tests.js'
 import { detectWeakeningWithAdapter, type WeakeningViolation } from '../src/analyzers/semantic-diff.js'
 import type { MutationReport } from '../src/analyzers/mutation.js'
 import { runMutationForLanguages } from '../src/languages/mutation.js'
@@ -97,9 +98,16 @@ async function main() {
       }
     }
 
-    if (runSemantic) {
+    // Protected tests are diffed even when semantic diff is off or not asked for.
+    const { files: protectedFiles, required } = config.protectedTests
+    const checkProtected = !parsed.flags.mutation && protectedFiles.length + required.length > 0
+    const changedFiles = runSemantic || checkProtected ? await getChangedFiles(compareRef) : []
+    let protectedViolations: ProtectedTestViolation[] = []
+
+    if (runSemantic || checkProtected) {
       const languages = resolveLanguages(config)
-      for (const file of await getChangedFiles(compareRef)) {
+      for (const file of changedFiles) {
+        if (!runSemantic && !isProtectedTestFile(file, config)) continue
         const language = languageForFile(file, languages)
         if (!language) continue
         const before = await getFileContent(file, compareRef)
@@ -110,6 +118,16 @@ async function main() {
       }
     }
 
+    if (checkProtected) {
+      protectedViolations = await checkProtectedTests({
+        config,
+        changedFiles,
+        semanticViolations,
+        readBase: async file => (await getFileContent(file, compareRef)) || null,
+        readHead: async file => readFile(file, 'utf-8').catch(() => null),
+      })
+    }
+
     const effectiveConfig = parsed.flags.threshold !== undefined ? { ...config, threshold: parsed.flags.threshold } : config
 
     const result = await runCheck(effectiveConfig, {
@@ -117,6 +135,7 @@ async function main() {
       mutationReport,
       semanticViolations,
       configViolations: resolved.configViolations,
+      protectedViolations,
     })
 
     if (parsed.command === 'score') {

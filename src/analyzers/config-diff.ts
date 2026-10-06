@@ -62,6 +62,29 @@ export function detectConfigWeakening(
     })
   }
 
+  const droppedProtected = removed(before.protectedTests.files, after.protectedTests.files)
+  if (droppedProtected.length > 0) {
+    violations.push({
+      field: 'protectedTests.files',
+      before: before.protectedTests.files,
+      after: after.protectedTests.files,
+      detail: `Protected test files removed: ${droppedProtected.join(', ')}`,
+    })
+  }
+
+  for (const rule of before.protectedTests.required) {
+    const kept = after.protectedTests.required.find(r => r.path === rule.path)
+    const dropped = kept ? removed(rule.references, kept.references) : rule.references
+    if (dropped.length > 0) {
+      violations.push({
+        field: 'protectedTests.required',
+        before: rule,
+        after: kept ?? null,
+        detail: `Required references removed for '${rule.path}': ${dropped.join(', ')}`,
+      })
+    }
+  }
+
   if (before.mutation.enabled && !after.mutation.enabled) {
     violations.push({
       field: 'mutation.enabled',
