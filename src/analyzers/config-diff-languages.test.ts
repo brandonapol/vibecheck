@@ -70,3 +70,21 @@ describe('detectConfigWeakening — composite threshold', () => {
     expect(fields({ threshold: 80 }, { threshold: 90 })).toEqual([])
   })
 })
+
+describe('detectConfigWeakening — commit enforcement levels', () => {
+  it('flags lowering enforcement for unknown commits', () => {
+    expect(fields({}, { enforcement: { unknown: 'warn' } })).toEqual(['enforcement.unknown'])
+  })
+
+  it('flags lowering enforcement for agent commits', () => {
+    expect(fields({}, { enforcement: { agents: 'off' } })).toEqual(['enforcement.agents'])
+  })
+
+  it('accepts raising one', () => {
+    expect(fields({ enforcement: { unknown: 'warn' } }, { enforcement: { unknown: 'block' } })).toEqual([])
+  })
+
+  it('flags removing an agent environment variable', () => {
+    expect(fields({}, { agentEnvVars: [] })).toEqual(['agentEnvVars'])
+  })
+})

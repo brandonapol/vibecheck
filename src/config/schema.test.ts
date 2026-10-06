@@ -104,7 +104,8 @@ describe('configSchema', () => {
 
   it('provides default enforcement levels', () => {
     const result = configSchema.parse({})
-    expect(result.enforcement).toEqual({ agents: 'block', humans: 'warn' })
+    expect(result.enforcement).toEqual({ agents: 'block', humans: 'warn', unknown: 'block' })
+    expect(result.agentEnvVars).toEqual(['CLAUDECODE'])
   })
 
   it('accepts custom agent trailers', () => {
