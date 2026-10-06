@@ -148,6 +148,34 @@ Once `languages` lists anything, only the listed languages run: add `typescript:
 
 A language with no registered adapter is an error, not a skipped language. So is a language with mutation enabled whose adapter has no mutation engine.
 
+## Protected Tests
+
+Some tests enforce a repo-wide rule (a test that scans the codebase for raw error strings, say), and some conventions every test of a kind must follow (every widget test covers a narrow and a wide viewport). Weakening those is worse than weakening an ordinary test, so they get their own gate.
+
+```typescript
+protectedTests: {
+  // Any weakening in these files blocks, whatever semanticDiff.enforcement
+  // says and whatever the score. Deleting one blocks too.
+  files: ['test/utils/error_text_test.dart', 'test/lint/**'],
+  // A changed file matching `path` must keep every identifier it referenced
+  // on the base branch.
+  required: [
+    { path: 'packages/*/test/**/*_test.dart', references: ['narrowViewport', 'wideViewport'] },
+  ],
+},
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `files` | `string[]` (globs) | `[]` | Test files where any semantic diff finding, from any pattern even if disabled, or deleting the file, fails the check |
+| `required` | `{ path, references }[]` | `[]` | For changed files matching `path`, each identifier in `references` that the base version used must still appear (whole-word match). Deleting the file counts as removing them all. |
+
+Notes:
+
+- Protected files are diffed even when `semanticDiff.enabled` is `false`, but only if a language adapter claims them (`testPatterns`).
+- `required` applies only to files that exist on the base branch. A new file that never referenced the identifiers isn't held to the rule, since it has nothing to lose. Requiring the identifiers in every new file is a lint rule, not a weakening check.
+- Removing a protected file from `files`, dropping a `required` rule, or dropping an identifier from one is reported as config weakening.
+
 ## Commit Identity
 
 The pre-commit validator applies a different enforcement level depending on who appears to be committing.

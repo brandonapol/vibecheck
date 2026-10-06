@@ -37,6 +37,9 @@ The composite score is a quality signal, not the only gate. A check passes only 
 2. **Mutation score** ≥ `mutation.threshold`, and every file ≥ `mutation.perFileThreshold`, when mutation analysis is enabled.
 3. **No semantic diff violations** when `semanticDiff.enforcement` is `'block'` (the default). Semantic diff carries only 10 of the score's weight, so at a perfect mutation score even unlimited weakening would still score 80. The gate is what stops it. Under `'warn'` or `'comment'`, violations are reported but don't fail the check.
 
+4. **No protected-test findings** (`protectedTests`, see [Configuration](configuration.md#protected-tests)), whatever the enforcement level.
+5. **No config weakening** relative to the base branch, in CI (see [CI Integration](ci.md#config-comes-from-the-base-branch)).
+
 Only violations of patterns listed in `semanticDiff.patterns` count, toward the score or the gate. The report lists every failed gate under **Blocking**.
 
 ```typescript

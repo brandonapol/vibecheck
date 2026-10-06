@@ -94,3 +94,32 @@ describe('detectConfigWeakening — protected branch', () => {
     expect(fields({}, { protectedBranch: 'my-feature' })).toEqual(['protectedBranch'])
   })
 })
+
+describe('detectConfigWeakening — protected tests', () => {
+  const rule = { path: 'packages/*/test/**', references: ['narrowViewport', 'wideViewport'] }
+
+  it('flags a protected file being removed from the list', () => {
+    expect(fields({ protectedTests: { files: ['a_test.dart', 'b_test.dart'] } }, { protectedTests: { files: ['a_test.dart'] } })).toEqual([
+      'protectedTests.files',
+    ])
+  })
+
+  it('flags a required rule being removed', () => {
+    expect(fields({ protectedTests: { required: [rule] } }, { protectedTests: { required: [] } })).toEqual([
+      'protectedTests.required',
+    ])
+  })
+
+  it('flags an identifier being dropped from a rule', () => {
+    expect(
+      fields(
+        { protectedTests: { required: [rule] } },
+        { protectedTests: { required: [{ ...rule, references: ['wideViewport'] }] } },
+      ),
+    ).toEqual(['protectedTests.required'])
+  })
+
+  it('accepts adding protection', () => {
+    expect(fields({}, { protectedTests: { files: ['a_test.dart'], required: [rule] } })).toEqual([])
+  })
+})

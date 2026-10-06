@@ -185,3 +185,13 @@ describe('composite threshold', () => {
     expect(() => defineConfig({ threshold: -1 } as any)).toThrow()
   })
 })
+
+describe('protectedTests', () => {
+  it('defaults to nothing protected', () => {
+    expect(defaultConfig.protectedTests).toEqual({ files: [], required: [] })
+  })
+
+  it('rejects a required rule with no references', () => {
+    expect(() => defineConfig({ protectedTests: { required: [{ path: 'x', references: [] }] } } as any)).toThrow()
+  })
+})

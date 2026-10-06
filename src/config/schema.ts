@@ -113,6 +113,18 @@ const languageSchema = z.object({
     .default({}),
 })
 
+const protectedTestsSchema = z
+  .object({
+    // Any weakening in these files, or deleting one, always blocks.
+    files: z.array(z.string()).default([]),
+    // A changed file matching `path` must keep every identifier it referenced
+    // on the base branch.
+    required: z
+      .array(z.object({ path: z.string(), references: z.array(z.string()).min(1) }))
+      .default([]),
+  })
+  .default({})
+
 const reporterSchema = z.enum(['console', 'github', 'gitlab'])
 
 export const configSchema = z.object({
@@ -144,6 +156,7 @@ export const configSchema = z.object({
   // Empty means TypeScript only, configured by the top-level fields above.
   languages: z.record(z.string(), languageSchema).default({}),
   semanticDiff: semanticDiffSchema,
+  protectedTests: protectedTestsSchema,
   propertyTests: propertyTestsSchema,
   hiddenTests: hiddenTestsSchema,
 

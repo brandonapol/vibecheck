@@ -2,6 +2,7 @@ import type { IntegrityScore } from '../core/score.js'
 import type { MutationReport } from '../analyzers/mutation.js'
 import type { WeakeningViolation } from '../analyzers/semantic-diff.js'
 import type { ConfigWeakeningViolation } from '../analyzers/config-diff.js'
+import type { ProtectedTestViolation } from '../analyzers/protected-tests.js'
 
 type ReportDetails = {
   mutation?: MutationReport
@@ -9,6 +10,7 @@ type ReportDetails = {
   mutationThreshold?: number
   semanticDiff?: WeakeningViolation[]
   configViolations?: ConfigWeakeningViolation[]
+  protectedViolations?: ProtectedTestViolation[]
   /** The overall verdict when gates other than the score decide it. */
   pass?: boolean
   failures?: string[]
@@ -55,6 +57,14 @@ export function formatReport(
     lines.push('  Assertion weakening detected:')
     for (const v of details.semanticDiff) {
       lines.push(`    ${v.file} — ${v.pattern}: ${v.detail}`)
+    }
+  }
+
+  if (details.protectedViolations && details.protectedViolations.length > 0) {
+    lines.push('')
+    lines.push('  Protected tests changed:')
+    for (const v of details.protectedViolations) {
+      lines.push(`    ${v.file} — ${v.rule}: ${v.detail}`)
     }
   }
 
