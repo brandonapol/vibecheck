@@ -177,4 +177,6 @@ Every signal here is advisory: an agent can strip its trailer and unset its envi
 
 vibecheck's pre-commit hook prevents agents from modifying the config file alongside implementation changes. This stops an agent from sneaking in threshold reductions or disabling analyzers as part of a feature commit. See [Pre-commit Hook](pre-commit.md) for details.
 
+In CI, `vibecheck check` reads the config from the base branch and fails when the PR's own config weakens it. See [CI Integration](ci.md#config-comes-from-the-base-branch).
+
 Config-weakening detection also covers `languages`: removing or disabling a language, disabling its mutation analysis, dropping test patterns or includes, and adding excludes are all reported.

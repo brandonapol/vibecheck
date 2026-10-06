@@ -1,6 +1,7 @@
 import type { Config } from '../config/schema.js'
 import { checkMutationThresholds, type MutationReport } from '../analyzers/mutation.js'
 import type { WeakeningViolation } from '../analyzers/semantic-diff.js'
+import type { ConfigWeakeningViolation } from '../analyzers/config-diff.js'
 import { calculateScore, type AnalyzerResults, type Weights } from '../core/score.js'
 import { formatReport } from '../reporters/console.js'
 
@@ -8,6 +9,8 @@ export type AnalyzerInputs = {
   mutationScore: number
   mutationReport?: MutationReport
   semanticViolations: WeakeningViolation[]
+  /** How the branch's config weakens the base branch's; any entry fails. */
+  configViolations?: ConfigWeakeningViolation[]
 }
 
 export type CheckResult = {
@@ -79,11 +82,16 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
     failures.push(`${semanticViolations.length} assertion weakening violation(s) with enforcement 'block'`)
   }
 
+  for (const v of inputs.configViolations ?? []) {
+    failures.push(`Config weakening — ${v.field}: ${v.detail}`)
+  }
+
   const pass = failures.length === 0
   const report = formatReport(score, config.threshold, {
     mutation: inputs.mutationReport,
     mutationThreshold: config.mutation.threshold,
     semanticDiff: semanticViolations.length > 0 ? semanticViolations : undefined,
+    configViolations: inputs.configViolations,
     pass,
     failures,
   })

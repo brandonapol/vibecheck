@@ -40,4 +40,5 @@ jobs:
       - run: npm ci
 
       - name: Run vibecheck
-        run: npx vibecheck check --threshold ${{ inputs.threshold }}
+        # The config is read from the base branch, never from the PR under review.
+        run: npx vibecheck check --threshold ${{ inputs.threshold }} --base origin/${{ github.base_ref || inputs.protected-branch }}

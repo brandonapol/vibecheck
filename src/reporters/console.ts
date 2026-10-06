@@ -1,12 +1,14 @@
 import type { IntegrityScore } from '../core/score.js'
 import type { MutationReport } from '../analyzers/mutation.js'
 import type { WeakeningViolation } from '../analyzers/semantic-diff.js'
+import type { ConfigWeakeningViolation } from '../analyzers/config-diff.js'
 
 type ReportDetails = {
   mutation?: MutationReport
   /** Shown on the mutation line; defaults to the composite threshold. */
   mutationThreshold?: number
   semanticDiff?: WeakeningViolation[]
+  configViolations?: ConfigWeakeningViolation[]
   /** The overall verdict when gates other than the score decide it. */
   pass?: boolean
   failures?: string[]
@@ -53,6 +55,14 @@ export function formatReport(
     lines.push('  Assertion weakening detected:')
     for (const v of details.semanticDiff) {
       lines.push(`    ${v.file} — ${v.pattern}: ${v.detail}`)
+    }
+  }
+
+  if (details.configViolations && details.configViolations.length > 0) {
+    lines.push('')
+    lines.push('  Config weakening detected (checked against the base branch config):')
+    for (const v of details.configViolations) {
+      lines.push(`    ${v.field}: ${v.detail}`)
     }
   }
 

@@ -23,6 +23,15 @@ export function detectConfigWeakening(
 ): ConfigWeakeningViolation[] {
   const violations: ConfigWeakeningViolation[] = []
 
+  if (after.protectedBranch !== before.protectedBranch) {
+    violations.push({
+      field: 'protectedBranch',
+      before: before.protectedBranch,
+      after: after.protectedBranch,
+      detail: `Protected branch changed from '${before.protectedBranch}' to '${after.protectedBranch}'`,
+    })
+  }
+
   if (after.threshold < before.threshold) {
     violations.push({
       field: 'threshold',

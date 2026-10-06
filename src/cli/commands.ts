@@ -4,6 +4,7 @@ export type CliCommand = {
     mutation?: boolean
     semantic?: boolean
     threshold?: number
+    base?: string
   }
 }
 
@@ -24,6 +25,8 @@ export function parseArgs(args: string[]): CliCommand {
     else if (arg === '--semantic') flags.semantic = true
     else if (arg === '--threshold' && i + 1 < rest.length) {
       flags.threshold = Number(rest[++i])
+    } else if (arg === '--base' && i + 1 < rest.length) {
+      flags.base = rest[++i]
     }
   }
 

@@ -117,3 +117,18 @@ describe('runCheck — thresholds', () => {
     expect(result.failures).toEqual([])
   })
 })
+
+describe('runCheck — config weakening', () => {
+  it('fails and lists each weakened field', async () => {
+    const result = await runCheck(defineConfig({}), {
+      mutationScore: 100,
+      semanticViolations: [],
+      configViolations: [
+        { field: 'mutation.threshold', before: 80, after: 10, detail: 'Mutation threshold reduced from 80 to 10' },
+      ],
+    })
+    expect(result.pass).toBe(false)
+    expect(result.failures.some(f => f.includes('mutation.threshold'))).toBe(true)
+    expect(result.report).toContain('Config weakening')
+  })
+})

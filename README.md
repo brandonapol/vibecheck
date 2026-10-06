@@ -110,7 +110,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - run: npx vibecheck check --threshold ${{ inputs.threshold }}
+      - run: npx vibecheck check --threshold ${{ inputs.threshold }} --base origin/${{ github.base_ref || 'main' }}
 ```
 
 ## Example Output
