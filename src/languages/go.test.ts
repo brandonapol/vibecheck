@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { execaSync } from 'execa'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createGoAdapter, goAdapter, GO_ASSERTION_STRENGTH } from './go.js'
 import { getAdapter } from './registry.js'
 
@@ -79,7 +82,10 @@ describe.skipIf(!hasGo)('goAdapter extraction (requires go)', () => {
 
 describe('goAdapter without a Go toolchain', () => {
   it('fails closed with a message naming the missing tool', async () => {
-    const adapter = createGoAdapter({ goBinary: 'go-does-not-exist-vibecheck' })
+    const adapter = createGoAdapter({
+      goBinary: 'go-does-not-exist-vibecheck',
+      cacheDir: mkdtempSync(join(tmpdir(), 'vibecheck-nogo-')),
+    })
     await expect(adapter.extractTests(SOURCE, 'sum_test.go')).rejects.toThrow(/Go toolchain/)
   })
 })
