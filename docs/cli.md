@@ -35,6 +35,7 @@ Exit code 0 when every gate passes, 1 otherwise. See [Pass/Fail](scoring.md#pass
 | `--mutation` | Run only mutation testing |
 | `--semantic` | Run only semantic diff analysis |
 | `--threshold <n>` | Override the composite score threshold (0-100). The mutation thresholds are not affected. |
+| `--base <ref>` | Read the config from `<ref>` and fail if the working-tree config weakens it. Implied in CI, with `origin/<protectedBranch>` as the ref. |
 
 ### `vibecheck score`
 

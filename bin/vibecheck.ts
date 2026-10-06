@@ -4,6 +4,7 @@ import { parseArgs } from '../src/cli/commands.js'
 import { runCheck } from '../src/cli/runner.js'
 import { scaffoldProject } from '../src/cli/init.js'
 import { loadConfig } from '../src/config/loader.js'
+import { resolveCheckConfig } from '../src/cli/config-source.js'
 import { detectWeakeningWithAdapter, type WeakeningViolation } from '../src/analyzers/semantic-diff.js'
 import type { MutationReport } from '../src/analyzers/mutation.js'
 import { runMutationForLanguages } from '../src/languages/mutation.js'
@@ -22,7 +23,8 @@ Commands:
 Options:
   --mutation            Run mutation analysis only
   --semantic            Run semantic diff only
-  --threshold <n>       Override the composite score threshold (0-100)`
+  --threshold <n>       Override the composite score threshold (0-100)
+  --base <ref>          Check against the config at <ref> (default in CI: origin/<protectedBranch>)`
 
 async function getChangedFiles(baseBranch: string): Promise<string[]> {
   try {
@@ -72,9 +74,12 @@ async function main() {
     process.exit(0)
   }
 
-  const config = await loadConfig()
+  const headConfig = await loadConfig()
 
   if (parsed.command === 'check' || parsed.command === 'score' || parsed.command === 'report') {
+    const resolved = await resolveCheckConfig({ head: headConfig, env: process.env, baseRef: parsed.flags.base })
+    const config = resolved.config
+    const compareRef = resolved.baseRef ?? config.protectedBranch
     let mutationScore = 100
     let mutationReport: MutationReport | undefined = undefined
     const semanticViolations: WeakeningViolation[] = []
@@ -94,10 +99,10 @@ async function main() {
 
     if (runSemantic) {
       const languages = resolveLanguages(config)
-      for (const file of await getChangedFiles(config.protectedBranch)) {
+      for (const file of await getChangedFiles(compareRef)) {
         const language = languageForFile(file, languages)
         if (!language) continue
-        const before = await getFileContent(file, config.protectedBranch)
+        const before = await getFileContent(file, compareRef)
         const after = await readFile(file, 'utf-8').catch(() => '')
         if (before && after) {
           semanticViolations.push(...(await detectWeakeningWithAdapter(before, after, file, language.adapter)))
@@ -111,6 +116,7 @@ async function main() {
       mutationScore,
       mutationReport,
       semanticViolations,
+      configViolations: resolved.configViolations,
     })
 
     if (parsed.command === 'score') {
