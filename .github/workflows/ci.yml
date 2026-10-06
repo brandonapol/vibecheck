@@ -28,6 +28,13 @@ jobs:
       - run: go vet ./... && go test ./...
         working-directory: helpers/go-testast
 
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - run: dart pub get && dart analyze && dart format --output=none --set-exit-if-changed . && dart test
+        working-directory: helpers/dart_testast
+
       - run: npm ci
       - run: npm run build
       - run: npm test

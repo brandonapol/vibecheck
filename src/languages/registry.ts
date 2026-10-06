@@ -3,9 +3,10 @@ import type { Config } from '../config/schema.js'
 import type { LanguageAdapter, ResolvedLanguage } from './types.js'
 import { typescriptAdapter } from './typescript.js'
 import { goAdapter } from './go.js'
+import { dartAdapter } from './dart.js'
 
 const adapters = new Map<string, LanguageAdapter>(
-  [typescriptAdapter, goAdapter].map(adapter => [adapter.id, adapter]),
+  [typescriptAdapter, goAdapter, dartAdapter].map(adapter => [adapter.id, adapter]),
 )
 
 /** Returns a function that unregisters the adapter. */

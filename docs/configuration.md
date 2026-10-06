@@ -122,7 +122,7 @@ Hidden tests can be sourced from a local directory or a private git repository:
 
 ## Languages
 
-By default vibecheck analyzes TypeScript only, configured by the top-level `testPatterns` and `mutation` fields. To analyze other languages, list them under `languages`. Each entry needs a registered language adapter; TypeScript and Go ship built in, and Dart is planned (see the [multi-language epic](https://github.com/brandonapol/vibecheck/issues/84)). Go has semantic diff only for now, so set `go: { mutation: { enabled: false } }` until its mutation engine lands (#79).
+By default vibecheck analyzes TypeScript only, configured by the top-level `testPatterns` and `mutation` fields. To analyze other languages, list them under `languages`. Each entry needs a registered language adapter; TypeScript, Go, and Dart ship built in (see the [multi-language epic](https://github.com/brandonapol/vibecheck/issues/84)). Go and Dart have semantic diff only for now, so set `mutation: { enabled: false }` on them until their mutation engines land (#79, #82).
 
 ```typescript
 export default defineConfig({

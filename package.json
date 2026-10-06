@@ -20,7 +20,10 @@
     "dist",
     "templates",
     "helpers/go-testast/go.mod",
-    "helpers/go-testast/main.go"
+    "helpers/go-testast/main.go",
+    "helpers/dart_testast/pubspec.yaml",
+    "helpers/dart_testast/lib/extract.dart",
+    "helpers/dart_testast/bin/dart_testast.dart"
   ],
   "scripts": {
     "build": "tsup",

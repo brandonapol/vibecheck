@@ -42,6 +42,35 @@ Go test files (`*_test.go`) are parsed by a small helper written in Go (`helpers
 
 Keys ignore formatting, comments, and failure messages, so `gofmt` and rewording a `t.Errorf` message never report anything.
 
+## Dart and Flutter
+
+Dart test files (`*_test.dart`) are parsed by a helper written in Dart (`helpers/dart_testast`, built on `package:analyzer`). On first use it's compiled with your Dart SDK (Flutter's `dart` works too): a scratch copy runs `dart pub get`, which needs network access once, then `dart compile exe`. The binary is cached in the OS temp directory, keyed by a hash of the helper's source. If the SDK is missing or a file doesn't parse, the check fails rather than passing.
+
+**Tests**: `test`, `testWidgets`, and `group` calls reachable from `main`, including ones registered inside loops, with IDs like `counter > shows the count`. A `skip:` argument skips a test or a whole group unless it's literally `false` or `null`, so `skip: isBrowser` counts as skipped. `@Skip()` on the library skips everything.
+
+**Assertions**: `expect` and `expectLater`. The matcher argument decides the name. A bare value (`expect(x, 3)`, `expect(x, expected)`) is `equals`. A bare identifier shaped like a matcher (`isValidUser`, `hasTitle`) is treated as a custom matcher and ranked neutral (5). `throwsA(anything)` is reported as `throwsAnything`.
+
+| Strength | Matchers |
+|----------|----------|
+| 10 | values and `equals`, `same`, `isTrue`, `isFalse`, `orderedEquals`, `findsOneWidget`, `findsNWidgets`, `findsExactly` |
+| 9 | `unorderedEquals`, `equalsIgnoringCase`, `isZero`, `findsNothing`, `matchesGoldenFile` |
+| 8 | `hasLength`, `closeTo`, `containsAllInOrder` |
+| 7 | `greaterThan` and friends, ranges, `containsAll`, `isEmpty`, `throwsA(<specific>)`, `findsAtLeastNWidgets`, `emitsInOrder` |
+| 6 | `contains`, `startsWith`, `matches`, `isA`, `TypeMatcher`, `throwsStateError` and the other specific `throws…` |
+| 5 | `predicate`, `allOf`, `isPositive`, custom matchers |
+| 4 | `isNot`, `anyOf`, `throwsException`, `throws` |
+| 3 | `throwsA(anything)`, `isNull`, `returnsNormally`, `completes`, `findsWidgets` |
+| 2 | `isNotNull`, `isNotEmpty`, `findsAny` |
+| 0 | `anything` (always tautological) |
+
+**Flutter weakening** falls out of the same comparison. Loosening a finder (`findsOneWidget` → `findsWidgets` → `findsAny`) is a `precision-reduction`. Deleting a `findsNothing` check is an `assertion-count-reduction`. Swapping `pump(duration)` for `pumpAndSettle()` changes the test body, so it's a `test-body-changed`.
+
+**Conditional**: inside an `if`, a ternary, the right side of `&&`/`||`/`??`, a `for` over anything but a non-empty list literal, a `while`, a `switch` case, or a `try` whose `catch` doesn't rethrow. Callbacks (`forEach`, `then`) aren't conditional.
+
+**Setup**: top-level declarations other than `main`, and every statement in `main` or a group body that isn't a test or group (`setUp`, `tearDown`, `late` variables).
+
+Keys are built from tokens, so formatting, comments, trailing commas, and `reason:` text never report anything.
+
 ## Assertion Strength Rankings
 
 Every assertion method has a strength score. Higher is more precise:
