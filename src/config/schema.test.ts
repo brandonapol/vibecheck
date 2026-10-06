@@ -170,3 +170,17 @@ describe('defineConfig', () => {
     expect(() => defineConfig({ mutation: { threshold: 200 } } as any)).toThrow()
   })
 })
+
+describe('composite threshold', () => {
+  it('defaults to 80, separate from the mutation threshold', () => {
+    expect(defaultConfig.threshold).toBe(80)
+    const config = defineConfig({ threshold: 70, mutation: { threshold: 90 } })
+    expect(config.threshold).toBe(70)
+    expect(config.mutation.threshold).toBe(90)
+  })
+
+  it('rejects values outside 0-100', () => {
+    expect(() => defineConfig({ threshold: 101 } as any)).toThrow()
+    expect(() => defineConfig({ threshold: -1 } as any)).toThrow()
+  })
+})
