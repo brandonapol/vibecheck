@@ -166,7 +166,7 @@ void main() {
   });
 
   test('the body key excludes assertions but not inputs', () {
-    String key(String body) => find(extract("void main() { test('t', () { $body }); }"), 't')['bodyKey'] as String;
+    String key(String body) => find(extract("void main() { test('t', () async { $body }); }"), 't')['bodyKey'] as String;
     expect(key('final v = f(1); expect(v, 3);'), key('final v = f(1); expect(v, 4);'));
     expect(key('final v = f(1); expect(v, 3);'), isNot(key('final v = f(2); expect(v, 3);')));
     expect(key('await tester.pump(const Duration(seconds: 1)); expect(a, 1);'),
