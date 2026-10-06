@@ -58,7 +58,7 @@ vibecheck is at **v0.2.0**. The mutation testing analyzer, semantic diff analyze
 
 ## Roadmap
 
-**v0.3.0** — Agent identity detection. Distinguish agent vs human commits via git trailers, apply different enforcement levels.
+**v0.3.0** — Agent identity detection. Detect agent commits from trailers and environment variables, and enforce commits with no signal as `unknown` (strict by default).
 
 **v0.4.0** — Hidden test suite runner, `vibecheck audit` for retroactive history scanning, GitLab CI support.
 

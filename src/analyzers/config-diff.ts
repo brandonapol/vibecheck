@@ -9,6 +9,8 @@ export type ConfigWeakeningViolation = {
   detail: string
 }
 
+const COMMIT_ENFORCEMENT_RANK: Record<string, number> = { block: 2, warn: 1, off: 0 }
+
 const ENFORCEMENT_RANK: Record<string, number> = {
   block: 3,
   warn: 2,
@@ -27,6 +29,27 @@ export function detectConfigWeakening(
       before: before.threshold,
       after: after.threshold,
       detail: `Composite threshold reduced from ${before.threshold} to ${after.threshold}`,
+    })
+  }
+
+  for (const tier of ['agents', 'unknown'] as const) {
+    if (COMMIT_ENFORCEMENT_RANK[after.enforcement[tier]] < COMMIT_ENFORCEMENT_RANK[before.enforcement[tier]]) {
+      violations.push({
+        field: `enforcement.${tier}`,
+        before: before.enforcement[tier],
+        after: after.enforcement[tier],
+        detail: `Enforcement for ${tier} commits downgraded from '${before.enforcement[tier]}' to '${after.enforcement[tier]}'`,
+      })
+    }
+  }
+
+  const droppedEnvVars = removed(before.agentEnvVars, after.agentEnvVars)
+  if (droppedEnvVars.length > 0) {
+    violations.push({
+      field: 'agentEnvVars',
+      before: before.agentEnvVars,
+      after: after.agentEnvVars,
+      detail: `Agent environment variables removed: ${droppedEnvVars.join(', ')}`,
     })
   }
 

@@ -90,7 +90,12 @@ const enforcementLevel = z.enum(['block', 'warn', 'off'])
 const enforcementSchema = z
   .object({
     agents: enforcementLevel.default('block'),
+    // Deprecated: nothing proves a commit is human, so a commit with no agent
+    // signal is enforced at `unknown`. Kept so existing configs still parse.
     humans: enforcementLevel.default('warn'),
+    // A commit with no agent signal. Leaving out a trailer is the easiest
+    // state for an agent to be in, so this must not default to lenient.
+    unknown: enforcementLevel.default('block'),
   })
   .default({})
 
@@ -128,6 +133,10 @@ export const configSchema = z.object({
       'Co-Authored-By: GitHub Copilot',
       'Co-Authored-By: cursor',
     ]),
+
+  // Environment variables whose presence (non-empty) marks an agent session.
+  // Claude Code sets CLAUDECODE in every shell it runs.
+  agentEnvVars: z.array(z.string()).default(['CLAUDECODE']),
 
   enforcement: enforcementSchema,
 

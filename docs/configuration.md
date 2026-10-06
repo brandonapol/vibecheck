@@ -148,6 +148,22 @@ Once `languages` lists anything, only the listed languages run: add `typescript:
 
 A language with no registered adapter is an error, not a skipped language. So is a language with mutation enabled whose adapter has no mutation engine.
 
+## Commit Identity
+
+The pre-commit validator applies a different enforcement level depending on who appears to be committing.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `agentTrailers` | `string[]` | Claude, Copilot, Cursor `Co-Authored-By` lines | Commit-message trailers that mark an agent commit |
+| `agentEnvVars` | `string[]` | `['CLAUDECODE']` | Environment variables whose non-empty presence marks an agent session. Claude Code sets `CLAUDECODE` in every shell it runs. |
+| `enforcement.agents` | `'block' \| 'warn' \| 'off'` | `'block'` | A commit with an agent signal |
+| `enforcement.unknown` | `'block' \| 'warn' \| 'off'` | `'block'` | A commit with no agent signal |
+| `enforcement.humans` | | `'warn'` | Deprecated and unused. Kept so existing configs still parse. |
+
+There's no `human` identity because nothing proves a commit is human. Leaving out a trailer is the easiest state for an agent to be in, and many setups (this repository's included) tell agents never to add one. So a commit with no agent signal is `unknown` and is enforced strictly by default. Set `enforcement.unknown: 'warn'` if you want a softer local hook for people while detected agents stay blocked.
+
+Every signal here is advisory: an agent can strip its trailer and unset its environment. CI is the enforcement boundary, and `vibecheck check` applies its gates to every commit regardless of identity. Lowering either level, or removing an agent environment variable, is reported as config weakening.
+
 ## Property Tests
 
 | Option | Type | Default | Description |
