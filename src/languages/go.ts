@@ -1,10 +1,7 @@
 import { execa } from 'execa'
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import type { ExtractedTest, SetupStatement } from '../analyzers/test-ast.js'
+import { join } from 'node:path'
+import { createHelperExtractor, type HelperSpec } from './helper.js'
 import type { LanguageAdapter } from './types.js'
 
 /** Matchers the Go helper emits. Lowercase names describe a guarded
@@ -75,9 +72,15 @@ export const GO_ASSERTION_STRENGTH: Record<string, number> = {
 // Helpers and custom checks are neutral, as unknown Jest matchers are.
 const UNKNOWN_MATCHER_STRENGTH = 5
 
-const HELPER_FILES = ['go.mod', 'main.go']
-
-type GoExtraction = { tests: ExtractedTest[]; setup: SetupStatement[] }
+const GO_HELPER: HelperSpec = {
+  dir: 'go-testast',
+  sources: ['go.mod', 'main.go'],
+  toolchainName: 'Go toolchain',
+  languageKey: 'go',
+  build: async (go, sourceDir, output) => {
+    await execa(go, ['build', '-o', output, '.'], { cwd: sourceDir })
+  },
+}
 
 export type GoAdapterOptions = {
   /** The `go` executable used to build the parser helper. */
@@ -86,67 +89,11 @@ export type GoAdapterOptions = {
   cacheDir?: string
 }
 
-/** The helper's source ships in the package under helpers/go-testast. */
-function helperDir(): string {
-  let dir = dirname(fileURLToPath(import.meta.url))
-  for (;;) {
-    const candidate = join(dir, 'helpers', 'go-testast')
-    if (existsSync(join(candidate, 'go.mod'))) return candidate
-    const parent = dirname(dir)
-    if (parent === dir) throw new Error('vibecheck: the Go test parser source (helpers/go-testast) is missing')
-    dir = parent
-  }
-}
-
-async function buildHelper(goBinary: string, cacheDir: string): Promise<string> {
-  const dir = helperDir()
-  const hash = createHash('sha256')
-  for (const file of HELPER_FILES) hash.update(readFileSync(join(dir, file)))
-  const binary = join(cacheDir, `go-testast-${hash.digest('hex').slice(0, 16)}${process.platform === 'win32' ? '.exe' : ''}`)
-  if (existsSync(binary)) return binary
-
-  mkdirSync(cacheDir, { recursive: true })
-  const partial = `${binary}.${process.pid}`
-  try {
-    await execa(goBinary, ['build', '-o', partial, '.'], { cwd: dir })
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new Error(`Go toolchain not found ('${goBinary}'): install Go, or disable languages.go`)
-    }
-    throw new Error(`Could not build the Go test parser: ${(err as { stderr?: string }).stderr ?? (err as Error).message}`)
-  }
-  // Rename so a concurrent run never executes a half-written binary.
-  renameSync(partial, binary)
-  return binary
-}
-
 export function createGoAdapter({
   goBinary = 'go',
   cacheDir = join(tmpdir(), 'vibecheck'),
 }: GoAdapterOptions = {}): LanguageAdapter {
-  let helper: Promise<string> | undefined
-  // extractTests and extractSetup on the same file share one helper run.
-  const extractions = new Map<string, Promise<GoExtraction>>()
-
-  function extract(source: string, path: string): Promise<GoExtraction> {
-    const key = `${path}\0${source}`
-    let pending = extractions.get(key)
-    if (!pending) {
-      pending = (async () => {
-        helper ??= buildHelper(goBinary, cacheDir)
-        try {
-          const { stdout } = await execa(await helper, [], { input: source })
-          return JSON.parse(stdout) as GoExtraction
-        } catch (err) {
-          const stderr = (err as { stderr?: string }).stderr
-          throw new Error(`Could not parse ${path} as Go: ${stderr || (err as Error).message}`)
-        }
-      })()
-      extractions.set(key, pending)
-    }
-    return pending
-  }
-
+  const extract = createHelperExtractor(GO_HELPER, { toolchain: goBinary, cacheDir })
   return {
     id: 'go',
     testPatterns: ['**/*_test.go'],

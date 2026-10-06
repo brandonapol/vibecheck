@@ -26,3 +26,6 @@ Thumbs.db
 
 # Docs
 site/
+
+# Dart helper
+helpers/dart_testast/.dart_tool/

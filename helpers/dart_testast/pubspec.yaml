@@ -1,0 +1,12 @@
+name: dart_testast
+description: Extracts tests, assertions, and setup from a Dart test file for vibecheck's semantic diff.
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  analyzer: ^14.5.0
+
+dev_dependencies:
+  test: ^1.32.0
