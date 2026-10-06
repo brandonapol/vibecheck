@@ -23,6 +23,13 @@ export type MutationReport = {
   survivingMutants: SurvivedMutant[]
 }
 
+/** A report that keeps its raw counts, so reports from several languages can
+ *  be merged by mutant rather than averaged by report. */
+export type CountedMutationReport = MutationReport & {
+  killed: number
+  total: number
+}
+
 type MutationViolation =
   | { type: 'mutation-score-below-threshold'; score: number; threshold: number; survivingMutants: SurvivedMutant[] }
   | { type: 'file-mutation-score-below-threshold'; file: string; score: number; threshold: number }
@@ -43,7 +50,7 @@ type StrykerReport = {
   files: Record<string, { mutants: StrykerMutant[] }>
 }
 
-export function extractScores(report: StrykerReport): MutationReport {
+export function extractScores(report: StrykerReport): CountedMutationReport {
   const fileScores: Record<string, number> = {}
   const survivingMutants: SurvivedMutant[] = []
   let totalKilled = 0
@@ -73,6 +80,20 @@ export function extractScores(report: StrykerReport): MutationReport {
     overallScore: totalMutants === 0 ? 100 : (totalKilled / totalMutants) * 100,
     fileScores,
     survivingMutants,
+    killed: totalKilled,
+    total: totalMutants,
+  }
+}
+
+export function mergeMutationReports(reports: CountedMutationReport[]): CountedMutationReport {
+  const killed = reports.reduce((sum, r) => sum + r.killed, 0)
+  const total = reports.reduce((sum, r) => sum + r.total, 0)
+  return {
+    overallScore: total === 0 ? 100 : (killed / total) * 100,
+    fileScores: Object.assign({}, ...reports.map(r => r.fileScores)),
+    survivingMutants: reports.flatMap(r => r.survivingMutants),
+    killed,
+    total,
   }
 }
 
@@ -107,7 +128,7 @@ export function checkMutationThresholds(
 
 const STRYKER_REPORT_PATH = '.stryker-output/report.json'
 
-export async function runMutationAnalysis(config: MutationConfig): Promise<MutationReport> {
+export async function runMutationAnalysis(config: MutationConfig): Promise<CountedMutationReport> {
   await execa('npx', [
     'stryker', 'run',
     '--reporters', 'json',

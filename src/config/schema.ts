@@ -94,6 +94,20 @@ const enforcementSchema = z
   })
   .default({})
 
+// Every field is optional so it can fall back: the typescript entry to the
+// top-level `testPatterns` and `mutation`, any other language to its adapter.
+const languageSchema = z.object({
+  enabled: z.boolean().default(true),
+  testPatterns: z.array(z.string()).optional(),
+  mutation: z
+    .object({
+      enabled: z.boolean().default(true),
+      include: z.array(z.string()).optional(),
+      exclude: z.array(z.string()).optional(),
+    })
+    .default({}),
+})
+
 const reporterSchema = z.enum(['console', 'github', 'gitlab'])
 
 export const configSchema = z.object({
@@ -114,6 +128,8 @@ export const configSchema = z.object({
   enforcement: enforcementSchema,
 
   mutation: mutationSchema,
+  // Empty means TypeScript only, configured by the top-level fields above.
+  languages: z.record(z.string(), languageSchema).default({}),
   semanticDiff: semanticDiffSchema,
   propertyTests: propertyTestsSchema,
   hiddenTests: hiddenTestsSchema,

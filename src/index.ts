@@ -4,10 +4,20 @@ export { loadConfig } from './config/loader.js'
 export { getProtectedPaths, getStagedFiles, matchesPatterns, fileExistsInBranch } from './core/resolver.js'
 export { calculateScore } from './core/score.js'
 export type { IntegrityScore, AnalyzerResults, Weights } from './core/score.js'
-export { extractScores, checkMutationThresholds } from './analyzers/mutation.js'
-export type { MutationReport, MutationConfig, SurvivedMutant } from './analyzers/mutation.js'
-export { detectWeakeningInDiff, ASSERTION_STRENGTH } from './analyzers/semantic-diff.js'
-export type { WeakeningViolation, WeakeningPattern } from './analyzers/semantic-diff.js'
+export { extractScores, checkMutationThresholds, mergeMutationReports } from './analyzers/mutation.js'
+export type { MutationReport, CountedMutationReport, MutationConfig, SurvivedMutant } from './analyzers/mutation.js'
+export {
+  detectWeakeningInDiff,
+  detectWeakeningWithAdapter,
+  compareExtractions,
+  ASSERTION_STRENGTH,
+} from './analyzers/semantic-diff.js'
+export type { WeakeningViolation, WeakeningPattern, TestExtraction } from './analyzers/semantic-diff.js'
+export type { ExtractedTest, ExtractedAssertion, SetupStatement } from './analyzers/test-ast.js'
+export { registerAdapter, getAdapter, resolveLanguages, languageForFile } from './languages/registry.js'
+export { runMutationForLanguages } from './languages/mutation.js'
+export { typescriptAdapter } from './languages/typescript.js'
+export type { LanguageAdapter, ResolvedLanguage, MutationRunOptions } from './languages/types.js'
 export { formatReport } from './reporters/console.js'
 export { runCheck } from './cli/runner.js'
 export type { CheckResult, AnalyzerInputs } from './cli/runner.js'

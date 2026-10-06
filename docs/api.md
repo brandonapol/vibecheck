@@ -121,11 +121,47 @@ ASSERTION_STRENGTH['toEqual']    // 9
 ASSERTION_STRENGTH['toBeDefined'] // 2
 ```
 
+### `detectWeakeningWithAdapter(before, after, file, adapter)`
+
+The language-agnostic form of `detectWeakeningInDiff`. It extracts both versions with `adapter` and ranks matchers with `adapter.assertionStrength`. Returns a promise, because an adapter may run an external parser. Extraction errors propagate; they are never reported as a clean diff.
+
+## Languages
+
+### `LanguageAdapter`
+
+```typescript
+type LanguageAdapter = {
+  id: string
+  testPatterns: string[]      // default test-file globs
+  sourcePatterns: string[]    // default mutation targets
+  extractTests(source: string, path: string): Promise<ExtractedTest[]>
+  extractSetup(source: string, path: string): Promise<SetupStatement[]>
+  assertionStrength(matcher: string): number   // 0-10; 4 and below is weak
+  runMutation?(options: MutationRunOptions): Promise<CountedMutationReport>
+}
+```
+
+### `registerAdapter(adapter)`
+
+Make an adapter available to `languages` config entries with the same `id`. Returns a function that unregisters it. Registering an id twice throws.
+
+### `resolveLanguages(config)` / `languageForFile(file, languages)`
+
+`resolveLanguages` turns the config into one entry per language, with every fallback applied. `languageForFile` returns the first enabled language whose test patterns match a path, or `null`.
+
+### `runMutationForLanguages(config)`
+
+Run each enabled language's mutation engine and merge the results with `mergeMutationReports`.
+
 ## Mutation Testing
 
 ### `extractScores(strykerOutput)`
 
-Parse Stryker JSON output into per-file mutation scores.
+Parse Stryker JSON output into per-file mutation scores, plus the `killed` and `total` mutant counts.
+
+### `mergeMutationReports(reports)`
+
+Combine reports from several languages. The overall score is weighted by mutant count, not averaged per report.
 
 ### `checkMutationThresholds(scores, threshold, perFileThreshold)`
 
