@@ -2,8 +2,11 @@ import micromatch from 'micromatch'
 import type { Config } from '../config/schema.js'
 import type { LanguageAdapter, ResolvedLanguage } from './types.js'
 import { typescriptAdapter } from './typescript.js'
+import { goAdapter } from './go.js'
 
-const adapters = new Map<string, LanguageAdapter>([[typescriptAdapter.id, typescriptAdapter]])
+const adapters = new Map<string, LanguageAdapter>(
+  [typescriptAdapter, goAdapter].map(adapter => [adapter.id, adapter]),
+)
 
 /** Returns a function that unregisters the adapter. */
 export function registerAdapter(adapter: LanguageAdapter): () => void {

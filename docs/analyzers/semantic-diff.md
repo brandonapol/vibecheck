@@ -10,6 +10,38 @@ The semantic diff analyzer detects assertion weakening between commits. When an 
 4. Compare the **sorted multiset** of assertion strengths rank by rank: reordering assertions is not weakening, and padding with weak assertions cannot hide a removed strong one
 5. Anything the AST cannot statically resolve — like `expect(x)[method]()` — fails closed as a `suspicious-assertion` violation
 
+## Go
+
+Go test files (`*_test.go`) are parsed by a small helper written in Go (`helpers/go-testast`, built with `go/ast`). It's compiled with your Go toolchain on first use and cached in the OS temp directory, keyed by a hash of its source. If Go is missing or a file doesn't parse, the check fails rather than passing.
+
+**Tests**: `func TestXxx(t *testing.T)`, every `t.Run` subtest (with IDs like `TestSum/adds`), and every row of a table-driven test whose subtest name is a string literal in the table (`t.Run(tc.name, …)` over a slice of structs, or `t.Run(name, …)` over a map). Rows are compared one by one, so deleting a row is a `test-deletion` and changing a row's values is a `test-body-changed`. A table whose names can't be resolved statically is walked as ordinary code, and its loop counts as conditional.
+
+**Assertions** come in three forms:
+
+- A `t.Error*`/`t.Fatal*`/`t.Fail*` call guarded by an `if` (or a tagless `switch` case). The condition is the assertion, and its shape decides the matcher.
+- A testify call (`assert.X(t, …)` / `require.X(t, …)`), with its `…f` variant folded into the base name and trailing message arguments left out of the key.
+- A call that passes the test's `*testing.T` to a helper, named after the helper and ranked neutral (5).
+
+| Strength | Go guard conditions | testify |
+|----------|---------------------|---------|
+| 10 | `got != want` (`equal`), `!reflect.DeepEqual`, `!cmp.Equal`, `cmp.Diff(…) != ""` (`deepEqual`) | `Exactly`, `Same` |
+| 9 | | `Equal`, `JSONEq`, `YAMLEq` |
+| 8 | `len(x) != n` (`length`) | `EqualValues`, `ElementsMatch`, `Len`, `InDelta`, `EqualError`, … |
+| 7 | `<`, `>`, `<=`, `>=` (`bound`), `!errors.Is` / `errors.As` (`errorIs`) | `Greater…`, `Less…`, `ErrorIs`, `ErrorAs`, `ErrorContains` |
+| 6 | `!strings.Contains` and friends (`contains`), fail when `err != nil` (`noError`) | `Contains`, `Subset`, `Regexp`, `IsType`, `NoError` |
+| 5 | any other call (`predicate`), helpers | `Positive`, `Implements` |
+| 4 | fail when `err == nil` (`anyError`), fail when two values are equal (`notEqual`), e.g. `if got == 0` | `Error`, `Panics`, `NotEqual` |
+| 3 | `!ok` (`truthy`), fail when `x != nil` (`isNil`) | `True`, `False`, `Nil`, `Empty`, `Zero` |
+| 2 | fail when `x == nil` (`notNil`) | `NotNil`, `NotEmpty`, `NotZero` |
+
+**Skips**: a `t.Skip`, `t.Skipf`, or `t.SkipNow` anywhere in a test, guarded or not (including `if testing.Short()`), marks it and its subtests skipped.
+
+**Conditional**: an assertion is conditional when something other than its own guard sits between it and the test: another `if`, a classic `for`, a `range` over anything but a non-empty literal or expanded table, or a `switch`/`select` case.
+
+**Tautologies**: comparing an expression to itself, comparing two literals, a bare `true`/`false` guard, `assert.Equal(t, x, x)`, `assert.True(t, true)`.
+
+Keys ignore formatting, comments, and failure messages, so `gofmt` and rewording a `t.Errorf` message never report anything.
+
 ## Assertion Strength Rankings
 
 Every assertion method has a strength score. Higher is more precise:
