@@ -132,3 +132,18 @@ describe('runCheck — config weakening', () => {
     expect(result.report).toContain('Config weakening')
   })
 })
+
+describe('runCheck — protected tests', () => {
+  it('fails on a protected violation even when semantic diff only warns', async () => {
+    const result = await runCheck(defineConfig({ semanticDiff: { enforcement: 'warn' } }), {
+      mutationScore: 100,
+      semanticViolations: [],
+      protectedViolations: [
+        { file: 'test/lint_test.dart', rule: 'protected-file-weakened', detail: 'skip-addition: skipped' },
+      ],
+    })
+    expect(result.pass).toBe(false)
+    expect(result.failures.some(f => f.includes('test/lint_test.dart'))).toBe(true)
+    expect(result.report).toContain('Protected tests')
+  })
+})
