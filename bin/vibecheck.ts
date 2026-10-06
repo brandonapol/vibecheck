@@ -4,8 +4,10 @@ import { parseArgs } from '../src/cli/commands.js'
 import { runCheck } from '../src/cli/runner.js'
 import { scaffoldProject } from '../src/cli/init.js'
 import { loadConfig } from '../src/config/loader.js'
-import { runMutationAnalysis } from '../src/analyzers/mutation.js'
-import { detectWeakeningInDiff } from '../src/analyzers/semantic-diff.js'
+import { detectWeakeningWithAdapter, type WeakeningViolation } from '../src/analyzers/semantic-diff.js'
+import type { MutationReport } from '../src/analyzers/mutation.js'
+import { runMutationForLanguages } from '../src/languages/mutation.js'
+import { languageForFile, resolveLanguages } from '../src/languages/registry.js'
 import { execa } from 'execa'
 import { readFile } from 'node:fs/promises'
 
@@ -22,9 +24,9 @@ Options:
   --semantic            Run semantic diff only
   --threshold <n>       Override score threshold (0-100)`
 
-async function getChangedTestFiles(baseBranch: string): Promise<string[]> {
+async function getChangedFiles(baseBranch: string): Promise<string[]> {
   try {
-    const { stdout } = await execa('git', ['diff', '--name-only', baseBranch, '--', '**/*.test.ts', '**/*.spec.ts'])
+    const { stdout } = await execa('git', ['diff', '--name-only', baseBranch])
     return stdout.split('\n').filter(Boolean)
   } catch {
     return []
@@ -74,15 +76,15 @@ async function main() {
 
   if (parsed.command === 'check' || parsed.command === 'score' || parsed.command === 'report') {
     let mutationScore = 100
-    let mutationReport = undefined
-    let semanticViolations: Awaited<ReturnType<typeof detectWeakeningInDiff>> = []
+    let mutationReport: MutationReport | undefined = undefined
+    const semanticViolations: WeakeningViolation[] = []
 
     const runMutation = parsed.flags.mutation || (!parsed.flags.semantic && config.mutation.enabled)
     const runSemantic = parsed.flags.semantic || (!parsed.flags.mutation && config.semanticDiff.enabled)
 
     if (runMutation) {
       try {
-        mutationReport = await runMutationAnalysis(config.mutation)
+        mutationReport = await runMutationForLanguages(config)
         mutationScore = mutationReport.overallScore
       } catch (err) {
         console.error('Mutation analysis failed:', (err as Error).message)
@@ -91,12 +93,14 @@ async function main() {
     }
 
     if (runSemantic) {
-      const changedFiles = await getChangedTestFiles(config.protectedBranch)
-      for (const file of changedFiles) {
+      const languages = resolveLanguages(config)
+      for (const file of await getChangedFiles(config.protectedBranch)) {
+        const language = languageForFile(file, languages)
+        if (!language) continue
         const before = await getFileContent(file, config.protectedBranch)
         const after = await readFile(file, 'utf-8').catch(() => '')
         if (before && after) {
-          semanticViolations.push(...detectWeakeningInDiff(before, after, file))
+          semanticViolations.push(...(await detectWeakeningWithAdapter(before, after, file, language.adapter)))
         }
       }
     }

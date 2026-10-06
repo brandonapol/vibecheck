@@ -1,4 +1,6 @@
 import type { Config } from '../config/schema.js'
+import { resolveLanguages } from '../languages/registry.js'
+import type { ResolvedLanguage } from '../languages/types.js'
 
 export type ConfigWeakeningViolation = {
   field: string
@@ -90,5 +92,75 @@ export function detectConfigWeakening(
     })
   }
 
+  detectLanguageWeakening(resolveLanguages(before), resolveLanguages(after), violations)
+
   return violations
+}
+
+function removed(before: string[], after: string[]): string[] {
+  return before.filter(e => !after.includes(e))
+}
+
+function detectLanguageWeakening(
+  before: ResolvedLanguage[],
+  after: ResolvedLanguage[],
+  violations: ConfigWeakeningViolation[],
+): void {
+  for (const was of before) {
+    if (!was.enabled) continue
+    const field = `languages.${was.id}`
+    const now = after.find(l => l.id === was.id)
+
+    if (!now || !now.enabled) {
+      violations.push({
+        field: `${field}.enabled`,
+        before: true,
+        after: false,
+        detail: `Language '${was.id}' was ${now ? 'disabled' : 'removed'}`,
+      })
+      continue
+    }
+
+    // The top-level checks above already cover a language derived from them.
+    if (was.source === 'top-level' && now.source === 'top-level') continue
+
+    if (was.mutation.enabled && !now.mutation.enabled) {
+      violations.push({
+        field: `${field}.mutation.enabled`,
+        before: true,
+        after: false,
+        detail: `Mutation analysis was disabled for '${was.id}'`,
+      })
+    }
+
+    const droppedPatterns = removed(was.testPatterns, now.testPatterns)
+    if (droppedPatterns.length > 0) {
+      violations.push({
+        field: `${field}.testPatterns`,
+        before: was.testPatterns,
+        after: now.testPatterns,
+        detail: `Test patterns removed for '${was.id}': ${droppedPatterns.join(', ')}`,
+      })
+    }
+
+    const droppedIncludes = removed(was.mutation.include, now.mutation.include)
+    if (droppedIncludes.length > 0) {
+      violations.push({
+        field: `${field}.mutation.include`,
+        before: was.mutation.include,
+        after: now.mutation.include,
+        detail: `Include patterns removed for '${was.id}': ${droppedIncludes.join(', ')}`,
+      })
+    }
+
+    const addedExcludes = removed(now.mutation.exclude, was.mutation.exclude)
+    if (addedExcludes.length > 0) {
+      violations.push({
+        field: `${field}.mutation.exclude`,
+        before: was.mutation.exclude,
+        after: now.mutation.exclude,
+        detail: `New exclusions added for '${was.id}': ${addedExcludes.join(', ')}`,
+      })
+    }
+  }
 }

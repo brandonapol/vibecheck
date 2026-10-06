@@ -117,6 +117,34 @@ Hidden tests can be sourced from a local directory or a private git repository:
     }
     ```
 
+## Languages
+
+By default vibecheck analyzes TypeScript only, configured by the top-level `testPatterns` and `mutation` fields. To analyze other languages, list them under `languages`. Each entry needs a registered language adapter; TypeScript ships built in, and Go and Dart are planned (see the [multi-language epic](https://github.com/brandonapol/vibecheck/issues/84)).
+
+```typescript
+export default defineConfig({
+  languages: {
+    typescript: {},                       // falls back to the top-level fields
+    go: {
+      testPatterns: ['**/*_test.go'],     // optional: defaults come from the adapter
+      mutation: { include: ['pkg/**/*.go'], exclude: ['**/*_gen.go'] },
+    },
+  },
+})
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | `boolean` | `true` | Analyze this language |
+| `testPatterns` | `string[]` | top-level `testPatterns` for TypeScript, otherwise the adapter's | Which changed files the semantic diff reads with this language's adapter |
+| `mutation.enabled` | `boolean` | `true` | Run this language's mutation engine |
+| `mutation.include` | `string[]` | top-level `mutation.include` for TypeScript, otherwise the adapter's | Files to mutate |
+| `mutation.exclude` | `string[]` | top-level `mutation.exclude` for TypeScript, otherwise `[]` | Files to skip |
+
+Once `languages` lists anything, only the listed languages run: add `typescript: {}` to keep TypeScript alongside another language. Thresholds stay global. Every language's mutants are merged into one report, so `mutation.threshold` applies to the combined score and `mutation.perFileThreshold` to every file.
+
+A language with no registered adapter is an error, not a skipped language. So is a language with mutation enabled whose adapter has no mutation engine.
+
 ## Property Tests
 
 | Option | Type | Default | Description |
@@ -129,3 +157,5 @@ Hidden tests can be sourced from a local directory or a private git repository:
 ## Config Protection
 
 vibecheck's pre-commit hook prevents agents from modifying the config file alongside implementation changes. This stops an agent from sneaking in threshold reductions or disabling analyzers as part of a feature commit. See [Pre-commit Hook](pre-commit.md) for details.
+
+Config-weakening detection also covers `languages`: removing or disabling a language, disabling its mutation analysis, dropping test patterns or includes, and adding excludes are all reported.

@@ -1,4 +1,11 @@
-import { extractSetup, extractTests, type ExtractedAssertion, type ExtractedTest } from './test-ast.js'
+import {
+  extractSetup,
+  extractTests,
+  type ExtractedAssertion,
+  type ExtractedTest,
+  type SetupStatement,
+} from './test-ast.js'
+import type { LanguageAdapter } from '../languages/types.js'
 
 export type WeakeningPattern =
   | 'precision-reduction'
@@ -62,15 +69,17 @@ export const ASSERTION_STRENGTH: Record<string, number> = {
 const UNKNOWN_MATCHER_STRENGTH = 5
 const WEAK_THRESHOLD = 4
 
-function strengthOf(matcher: string): number {
+export function typescriptAssertionStrength(matcher: string): number {
   return ASSERTION_STRENGTH[matcher] ?? UNKNOWN_MATCHER_STRENGTH
 }
 
-function sortedStrengths(test: ExtractedTest): number[] {
+type Strength = (matcher: string) => number
+
+function sortedStrengths(test: ExtractedTest, strengthOf: Strength): number[] {
   return test.assertions.map(a => strengthOf(a.matcher)).sort((a, b) => b - a)
 }
 
-function sortedMatchers(test: ExtractedTest): string[] {
+function sortedMatchers(test: ExtractedTest, strengthOf: Strength): string[] {
   return [...test.assertions]
     .sort((a, b) => strengthOf(b.matcher) - strengthOf(a.matcher))
     .map(a => a.matcher)
@@ -139,6 +148,7 @@ function compareMatchedTest(
   { before, after }: MatchedPair,
   file: string,
   violations: WeakeningViolation[],
+  strengthOf: Strength,
 ): void {
   if (!before.skipped && after.skipped) {
     violations.push({
@@ -162,10 +172,10 @@ function compareMatchedTest(
   // Sorted-multiset comparison: rank-by-rank over descending strengths, so
   // reordering is not weakening and weak padding cannot hide a removed strong
   // assertion.
-  const beforeStrengths = sortedStrengths(before)
-  const afterStrengths = sortedStrengths(after)
-  const beforeMatchers = sortedMatchers(before)
-  const afterMatchers = sortedMatchers(after)
+  const beforeStrengths = sortedStrengths(before, strengthOf)
+  const afterStrengths = sortedStrengths(after, strengthOf)
+  const beforeMatchers = sortedMatchers(before, strengthOf)
+  const afterMatchers = sortedMatchers(after, strengthOf)
 
   for (let rank = 0; rank < Math.min(beforeStrengths.length, afterStrengths.length); rank++) {
     if (afterStrengths[rank] < beforeStrengths[rank]) {
@@ -177,7 +187,7 @@ function compareMatchedTest(
     }
   }
 
-  reportChangedAssertions({ before, after }, file, violations)
+  reportChangedAssertions({ before, after }, file, violations, strengthOf)
   reportNeutralizedAssertions({ before, after }, file, violations)
 
   if (before.bodyKey !== after.bodyKey) {
@@ -197,6 +207,7 @@ function reportChangedAssertions(
   { before, after }: MatchedPair,
   file: string,
   violations: WeakeningViolation[],
+  strengthOf: Strength,
 ): void {
   const unmatchedAfter: ExtractedAssertion[] = [...after.assertions]
   const unmatchedBefore = before.assertions.filter(a => !takeByKey(unmatchedAfter, a.key))
@@ -238,9 +249,14 @@ function reportNeutralizedAssertions(
   }
 }
 
-function reportSetupChanges(before: string, after: string, file: string, violations: WeakeningViolation[]): void {
-  const remaining = extractSetup(after)
-  for (const statement of extractSetup(before)) {
+function reportSetupChanges(
+  before: SetupStatement[],
+  after: SetupStatement[],
+  file: string,
+  violations: WeakeningViolation[],
+): void {
+  const remaining = [...after]
+  for (const statement of before) {
     if (takeByKey(remaining, statement.key)) continue
     violations.push({
       file,
@@ -271,13 +287,54 @@ function reportTautologies(test: ExtractedTest, file: string, violations: Weaken
   }
 }
 
+/** What an adapter extracted from one version of a test file. */
+export type TestExtraction = {
+  tests: ExtractedTest[]
+  setup: SetupStatement[]
+}
+
+/** TypeScript entry point, kept synchronous for existing callers. */
 export function detectWeakeningInDiff(
   before: string,
   after: string,
   file: string,
 ): WeakeningViolation[] {
+  return compareExtractions(
+    { tests: extractTests(before), setup: extractSetup(before) },
+    { tests: extractTests(after), setup: extractSetup(after) },
+    file,
+    typescriptAssertionStrength,
+  )
+}
+
+export async function detectWeakeningWithAdapter(
+  before: string,
+  after: string,
+  file: string,
+  adapter: LanguageAdapter,
+): Promise<WeakeningViolation[]> {
+  const [beforeTests, beforeSetup, afterTests, afterSetup] = await Promise.all([
+    adapter.extractTests(before, file),
+    adapter.extractSetup(before, file),
+    adapter.extractTests(after, file),
+    adapter.extractSetup(after, file),
+  ])
+  return compareExtractions(
+    { tests: beforeTests, setup: beforeSetup },
+    { tests: afterTests, setup: afterSetup },
+    file,
+    matcher => adapter.assertionStrength(matcher),
+  )
+}
+
+export function compareExtractions(
+  before: TestExtraction,
+  after: TestExtraction,
+  file: string,
+  strengthOf: Strength,
+): WeakeningViolation[] {
   const violations: WeakeningViolation[] = []
-  const { pairs, deleted, added } = matchTests(extractTests(before), extractTests(after))
+  const { pairs, deleted, added } = matchTests(before.tests, after.tests)
 
   for (const test of deleted) {
     violations.push({
@@ -287,10 +344,10 @@ export function detectWeakeningInDiff(
     })
   }
 
-  reportSetupChanges(before, after, file, violations)
+  reportSetupChanges(before.setup, after.setup, file, violations)
 
   for (const pair of pairs) {
-    compareMatchedTest(pair, file, violations)
+    compareMatchedTest(pair, file, violations, strengthOf)
     reportSuspicious(pair.after, file, violations)
     reportTautologies(pair.after, file, violations)
   }
