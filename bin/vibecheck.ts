@@ -22,7 +22,7 @@ Commands:
 Options:
   --mutation            Run mutation analysis only
   --semantic            Run semantic diff only
-  --threshold <n>       Override score threshold (0-100)`
+  --threshold <n>       Override the composite score threshold (0-100)`
 
 async function getChangedFiles(baseBranch: string): Promise<string[]> {
   try {
@@ -105,9 +105,7 @@ async function main() {
       }
     }
 
-    const effectiveConfig = parsed.flags.threshold
-      ? { ...config, mutation: { ...config.mutation, threshold: parsed.flags.threshold } }
-      : config
+    const effectiveConfig = parsed.flags.threshold !== undefined ? { ...config, threshold: parsed.flags.threshold } : config
 
     const result = await runCheck(effectiveConfig, {
       mutationScore,

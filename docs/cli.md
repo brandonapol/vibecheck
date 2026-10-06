@@ -25,16 +25,16 @@ Run all enabled analyzers and report the composite integrity score.
 npx vibecheck check
 npx vibecheck check --mutation      # Mutation analysis only
 npx vibecheck check --semantic      # Semantic diff only
-npx vibecheck check --threshold 90  # Override pass/fail threshold
+npx vibecheck check --threshold 90  # Override the composite score threshold
 ```
 
-Exit code 0 if the score meets the threshold, 1 otherwise.
+Exit code 0 when every gate passes, 1 otherwise. See [Pass/Fail](scoring.md#passfail) for the gates.
 
 | Flag | Description |
 |------|-------------|
 | `--mutation` | Run only mutation testing |
 | `--semantic` | Run only semantic diff analysis |
-| `--threshold <n>` | Override the minimum score (0-100) |
+| `--threshold <n>` | Override the composite score threshold (0-100). The mutation thresholds are not affected. |
 
 ### `vibecheck score`
 
@@ -66,7 +66,7 @@ npx vibecheck help
 | Code | Meaning |
 |------|---------|
 | `0` | All checks passed |
-| `1` | Score below threshold or violations detected |
+| `1` | A gate failed: composite score, mutation score, or blocking semantic violations |
 
 ## Environment Variables
 

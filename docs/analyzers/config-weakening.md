@@ -18,7 +18,7 @@ This effectively disarms vibecheck without modifying any test code. The config w
 
 | Change | Example |
 |--------|---------|
-| Threshold reduction | `threshold: 80` to `threshold: 50` |
+| Threshold reduction | `threshold: 80` to `threshold: 50`, top-level or `mutation.threshold` |
 | Per-file threshold reduction | `perFileThreshold: 60` to `perFileThreshold: 20` |
 | Analyzer disabled | `enabled: true` to `enabled: false` |
 | Enforcement downgrade | `'block'` to `'warn'` or `'comment'` |

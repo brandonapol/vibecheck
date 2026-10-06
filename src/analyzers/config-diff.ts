@@ -21,6 +21,15 @@ export function detectConfigWeakening(
 ): ConfigWeakeningViolation[] {
   const violations: ConfigWeakeningViolation[] = []
 
+  if (after.threshold < before.threshold) {
+    violations.push({
+      field: 'threshold',
+      before: before.threshold,
+      after: after.threshold,
+      detail: `Composite threshold reduced from ${before.threshold} to ${after.threshold}`,
+    })
+  }
+
   if (before.mutation.enabled && !after.mutation.enabled) {
     violations.push({
       field: 'mutation.enabled',

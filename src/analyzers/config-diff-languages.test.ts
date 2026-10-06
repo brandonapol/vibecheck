@@ -60,3 +60,13 @@ describe('detectConfigWeakening — languages', () => {
     expect(fields({}, { mutation: { include: [] } })).toEqual(['mutation.include'])
   })
 })
+
+describe('detectConfigWeakening — composite threshold', () => {
+  it('flags lowering the composite threshold', () => {
+    expect(fields({ threshold: 80 }, { threshold: 60 })).toEqual(['threshold'])
+  })
+
+  it('accepts raising it', () => {
+    expect(fields({ threshold: 80 }, { threshold: 90 })).toEqual([])
+  })
+})

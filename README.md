@@ -43,7 +43,7 @@ This creates:
 npx vibecheck check             # Run all enabled analyzers
 npx vibecheck check --mutation  # Run mutation analysis only
 npx vibecheck check --semantic  # Run semantic diff only
-npx vibecheck check --threshold 90  # Override score threshold
+npx vibecheck check --threshold 90  # Override the composite score threshold
 npx vibecheck score             # Output composite score (0-100)
 npx vibecheck report            # Generate full integrity report
 ```
@@ -94,7 +94,7 @@ name: Vibecheck Test Integrity
 on:
   workflow_call:
     inputs:
-      mutation-threshold:
+      threshold:
         type: number
         default: 80
 
@@ -110,7 +110,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - run: npx vibecheck check --threshold ${{ inputs.mutation-threshold }}
+      - run: npx vibecheck check --threshold ${{ inputs.threshold }}
 ```
 
 ## Example Output
