@@ -51,4 +51,8 @@ describe('parseArgs', () => {
     const result = parseArgs(['check', '--threshold', '90'])
     expect(result).toEqual({ command: 'check', flags: { threshold: 90 } })
   })
+
+  it('parses --base with a ref', () => {
+    expect(parseArgs(['check', '--base', 'origin/main'])).toEqual({ command: 'check', flags: { base: 'origin/main' } })
+  })
 })

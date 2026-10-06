@@ -88,3 +88,9 @@ describe('detectConfigWeakening — commit enforcement levels', () => {
     expect(fields({}, { agentEnvVars: [] })).toEqual(['agentEnvVars'])
   })
 })
+
+describe('detectConfigWeakening — protected branch', () => {
+  it('flags repointing protectedBranch', () => {
+    expect(fields({}, { protectedBranch: 'my-feature' })).toEqual(['protectedBranch'])
+  })
+})
