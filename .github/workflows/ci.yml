@@ -47,3 +47,23 @@ jobs:
         working-directory: test/fixtures/stryker
       - run: npm run build
       - run: npm test
+
+  # This repo's own gate. Consumers use templates/github-actions.yml, which
+  # calls the published package. Here the binary is the one just built.
+  vibecheck:
+    name: Dogfood
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - name: Run vibecheck
+        run: node dist/bin/vibecheck.js check --semantic --base origin/${{ github.base_ref || 'main' }}
