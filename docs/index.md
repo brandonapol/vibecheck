@@ -23,7 +23,7 @@ vibecheck layers four complementary checks into a composite integrity score (0-1
 
 | Analyzer | What it catches | Weight |
 |----------|----------------|--------|
-| **Mutation testing** (Stryker, gremlins for Go) | Weak assertions that survive code mutations | 40% |
+| **Mutation testing** (Stryker, gremlins for Go, mutation_test for Dart) | Weak assertions that survive code mutations | 40% |
 | **Hidden test suites** | Tests fitted to implementation instead of spec | 30% |
 | **Property-based tests** | Hardcoded return values | 20% |
 | **Semantic diff analysis** | Retroactive assertion weakening | 10% |
@@ -54,10 +54,10 @@ vibecheck: Test Integrity Score — 74/100 (threshold: 80) FAIL
 
 ## Current Status
 
-vibecheck is at **v0.3.0**. Identity detection, semantic diff, hidden tests, Go and Dart/Flutter analysis, Go mutation testing, audit, and CI templates are in this release. This repo runs the semantic check and a coverage floor on itself. See the [roadmap](#roadmap) for what is not in 0.3.0.
+vibecheck **v0.3.0** is the latest npm release. It has identity detection, semantic diff, hidden tests, Go and Dart/Flutter analysis, Go mutation testing, audit, and CI templates. Main also runs Dart mutation testing via mutation_test; that ships in the next release. This repo runs the semantic check and a coverage floor on itself. See the [roadmap](#roadmap) for what is not in 0.3.0.
 
 ## Roadmap
 
-**v0.4.0** — Dart mutation testing, property-based test enforcement, monorepo config.
+**v0.4.0** — Property-based test enforcement and monorepo config. Dart mutation testing is already on main and is part of this release.
 
 **v0.5.0** — VS Code extension that marks protected test files.

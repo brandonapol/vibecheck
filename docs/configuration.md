@@ -135,7 +135,7 @@ Holdout tests the agent is not supposed to read. Off unless `enabled` is true. S
 
 ## Languages
 
-By default vibecheck analyzes TypeScript only, configured by the top-level `testPatterns` and `mutation` fields. To analyze other languages, list them under `languages`. Each entry needs a registered language adapter; TypeScript, Go, and Dart ship built in (see the [multi-language epic](https://github.com/brandonapol/vibecheck/issues/84)). Go mutation testing runs [gremlins](https://github.com/go-gremlins/gremlins), which is not a dependency: it must be on `PATH` (`go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0`), or set `languages.go.mutation.enabled` to false. Dart has no mutation engine yet (#82); leave `languages.dart.mutation.enabled` false.
+By default vibecheck analyzes TypeScript only, configured by the top-level `testPatterns` and `mutation` fields. To analyze other languages, list them under `languages`. Each entry needs a registered language adapter; TypeScript, Go, and Dart ship built in (see the [multi-language epic](https://github.com/brandonapol/vibecheck/issues/84)). Go mutation testing runs [gremlins](https://github.com/go-gremlins/gremlins), which is not a dependency: it must be on `PATH` (`go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0`), or set `languages.go.mutation.enabled` to false. Dart mutation testing runs [`mutation_test`](https://pub.dev/packages/mutation_test) 1.8.1 via `dart run` in the package, so that package needs `mutation_test: 1.8.1` as a dev dependency. The Dart SDK has to be on `PATH`. Set `languages.dart.mutation.enabled` to false to analyze Dart tests without mutation testing.
 
 ```typescript
 export default defineConfig({
@@ -146,7 +146,8 @@ export default defineConfig({
       // mutation.enabled defaults to true and runs gremlins.
     },
     dart: {
-      mutation: { enabled: false },       // no Dart mutation engine yet (#82)
+      // mutation.enabled defaults to true and runs mutation_test.
+      // The default include is lib/**/*.dart. Test files are never mutated.
     },
   },
 })
