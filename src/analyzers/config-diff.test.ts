@@ -131,4 +131,30 @@ describe('detectConfigWeakening', () => {
     expect(violations).toHaveLength(1)
     expect(violations[0].field).toBe('mutation.include')
   })
+
+  it('detects disabling hidden tests, lowering their threshold, or moving the source', () => {
+    const enabled = {
+      ...defaultConfig,
+      hiddenTests: {
+        enabled: true as const,
+        source: 'repo' as const,
+        url: 'git@github.com:org/hidden.git',
+        branch: 'main',
+        tool: 'vitest' as const,
+        threshold: 100,
+        enforcement: 'block' as const,
+      },
+    }
+    const fields = (after: typeof enabled) => detectConfigWeakening(enabled, after).map(v => v.field)
+    expect(fields({ ...enabled, hiddenTests: { enabled: false } })).toContain('hiddenTests.enabled')
+    expect(fields({
+      ...enabled,
+      hiddenTests: { ...enabled.hiddenTests, threshold: 50 },
+    })).toContain('hiddenTests.threshold')
+    expect(fields({
+      ...enabled,
+      hiddenTests: { enabled: true, source: 'directory', path: '.vibecheck-hidden', tool: 'vitest', threshold: 100, enforcement: 'block' },
+    })).toContain('hiddenTests.source')
+    expect(fields(enabled)).toEqual([])
+  })
 })
