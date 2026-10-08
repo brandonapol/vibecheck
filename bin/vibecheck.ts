@@ -13,12 +13,11 @@ import type { ExtractedTest } from '../src/analyzers/test-ast.js'
 import type { MutationReport } from '../src/analyzers/mutation.js'
 import { runMutationForLanguages } from '../src/languages/mutation.js'
 import { languageForFile, resolveLanguages } from '../src/languages/registry.js'
-import { getChangedFiles, getFileAtRef, listWorktreeFilesContaining } from '../src/cli/worktree.js'
+import { auditTarget, getChangedFiles, getFileAtRef, listWorktreeFilesContaining, readAuditedFile } from '../src/cli/worktree.js'
 import { runInstalledHook } from '../src/hooks/pre-commit.js'
 import { collectStatus, formatStatus } from '../src/cli/status.js'
 import { fileExistsInBranch } from '../src/core/resolver.js'
 import { execa } from 'execa'
-import { readFile } from 'node:fs/promises'
 
 const USAGE = `Usage: vibecheck <command> [options]
 
@@ -126,14 +125,17 @@ async function main() {
     // Protected tests are diffed even when semantic diff is off or not asked for.
     const { files: protectedFiles, required } = config.protectedTests
     const checkProtected = !parsed.flags.mutation && protectedFiles.length + required.length > 0
-    const changedFiles = runSemantic || checkProtected || runTamper ? await getChangedFiles(compareRef) : []
+    const target = auditTarget(process.env)
+    const changedFiles = runSemantic || checkProtected || runTamper
+      ? await getChangedFiles(compareRef, target === 'HEAD' ? 'HEAD' : undefined)
+      : []
     let protectedViolations: ProtectedTestViolation[] = []
 
     if (runSemantic || checkProtected) {
       const languages = resolveLanguages(config)
       const files = [...changedFiles]
       if (runSemantic && changedFiles.some(file => /\.(png|gif|jpe?g|webp)$/i.test(file))) {
-        const hits = await listWorktreeFilesContaining('matchesGoldenFile')
+        const hits = await listWorktreeFilesContaining('matchesGoldenFile', target)
         files.push(...extraGoldenTestFiles(changedFiles, hits))
       }
       for (const file of files) {
@@ -141,7 +143,7 @@ async function main() {
         const language = languageForFile(file, languages)
         if (!language) continue
         const before = await getFileAtRef(file, compareRef)
-        const after = await readFile(file, 'utf-8').catch(() => '')
+        const after = (await readAuditedFile(file, target)) ?? ''
         if (before && after) {
           semanticViolations.push(...(await detectWeakeningWithAdapter(before, after, file, language.adapter)))
           if (runSemantic) {
@@ -167,7 +169,7 @@ async function main() {
         changes.push({
           file,
           before: await getFileAtRef(file, compareRef),
-          after: await readFile(file, 'utf-8').catch(() => ''),
+          after: (await readAuditedFile(file, target)) ?? '',
         })
       }
       tamperViolations = detectTamper(changes)
@@ -179,7 +181,7 @@ async function main() {
         changedFiles,
         semanticViolations,
         readBase: async file => (await getFileAtRef(file, compareRef)) || null,
-        readHead: async file => readFile(file, 'utf-8').catch(() => null),
+        readHead: async file => readAuditedFile(file, target),
       })
     }
 
