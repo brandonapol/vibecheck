@@ -58,7 +58,7 @@ describe('dartAdapter', () => {
   })
 
   it('has no mutation engine yet', () => {
-    expect(dartAdapter.runMutation).toBeUndefined()
+    expect(dartAdapter.runMutation).toBeTypeOf('function')
   })
 })
 

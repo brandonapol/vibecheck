@@ -34,3 +34,4 @@ site/
 
 # Dart helper
 helpers/dart_testast/.dart_tool/
+test/fixtures/dart/.dart_tool/
