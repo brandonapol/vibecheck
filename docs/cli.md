@@ -54,6 +54,17 @@ npx vibecheck commit-msg --file .git/COMMIT_EDITMSG
 
 Exit 1 when `--file` is missing. Otherwise exit 0, including when the message is left unchanged.
 
+### `vibecheck audit`
+
+Scan commits reachable from `HEAD` for agent trailers on edits to test files that already existed in the parent commit. A new test file is not a hit. The current process environment is ignored, so running this command inside an agent session does not mark human commits.
+
+```bash
+npx vibecheck audit
+npx vibecheck audit --since origin/main
+```
+
+Exit 0 when nothing matches. Exit 1 when at least one commit modified a protected test, and when `--since` is not a single revision. Each hit prints a 12-character sha, the trailer that matched, and the path that already existed.
+
 ### `vibecheck check`
 
 Run all enabled analyzers and report the composite integrity score.
@@ -75,6 +86,7 @@ Exit code 0 when every gate passes, 1 otherwise. See [Pass/Fail](scoring.md#pass
 | `--threshold <n>` | Override the composite score threshold (0-100). The mutation thresholds are not affected. |
 | `--base <ref>` | Read the config from `<ref>` and fail if the working-tree config weakens it. Implied in CI, with `origin/<protectedBranch>` as the ref. |
 | `--hook` | Pre-commit mode. Classifies staged files, blocks edits to tests that already exist on the protected branch, and exits from the enforcement level (`block` rejects, `warn` prints and allows, `off` skips). Does not run mutation or semantic diff. |
+| `--since <ref>` | For `audit` only. Scan `<ref>..HEAD` instead of every commit reachable from `HEAD`. |
 
 ### `vibecheck score`
 
@@ -106,7 +118,7 @@ npx vibecheck help
 | Code | Meaning |
 |------|---------|
 | `0` | All checks passed, or `protected` found the path is not a protected test |
-| `1` | A gate failed: composite score, mutation score, or blocking semantic violations |
+| `1` | A gate failed: composite score, mutation score, blocking semantic violations, or `audit` found an agent commit that modified an existing test |
 | `2` | `protected` refused the path: it is a test on the protected branch, or `--file` was omitted |
 
 ## Environment Variables

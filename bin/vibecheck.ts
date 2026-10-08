@@ -17,6 +17,7 @@ import { auditTarget, getChangedFiles, getFileAtRef, listWorktreeFilesContaining
 import { runHiddenTests, type HiddenTestReport } from '../src/analyzers/hidden-tests.js'
 import { runInstalledHook } from '../src/hooks/pre-commit.js'
 import { runCommitMsgHook } from '../src/hooks/commit-msg.js'
+import { auditRange, findAuditHits, formatAudit, loadAuditCommits } from '../src/cli/audit.js'
 import { collectStatus, formatStatus } from '../src/cli/status.js'
 import { protectedMessage, protectionFor } from '../src/cli/protected.js'
 import { fileExistsInBranch } from '../src/core/resolver.js'
@@ -29,6 +30,7 @@ Commands:
   status                Show which test files are protected
   protected --file <p>  Exit 2 when <p> is a protected test
   commit-msg --file <p> Tag a commit message with the phase, when hooks.commitMsg is on
+  audit                 Scan history for agent edits to existing tests
   check                 Run all enabled analyzers and report results
   score                 Output composite integrity score (0-100)
   report                Generate full integrity report
@@ -38,6 +40,7 @@ Options:
   --semantic            Run semantic diff only
   --threshold <n>       Override the composite score threshold (0-100)
   --base <ref>          Check against the config at <ref> (default in CI: origin/<protectedBranch>)
+  --since <ref>         With audit, scan <ref>..HEAD instead of all of HEAD
   --hook                Pre-commit mode: staged files and enforcement only`
 
 function goldenSides(tests: ExtractedTest[], file: string): GoldenSide[] {
@@ -136,6 +139,19 @@ async function main() {
   }
 
   const headConfig = await loadConfig()
+
+  if (parsed.command === 'audit') {
+    let range: string
+    try {
+      range = auditRange(parsed.flags.since)
+    } catch (err) {
+      console.error((err as Error).message)
+      process.exit(1)
+    }
+    const hits = findAuditHits(await loadAuditCommits(process.cwd(), range), headConfig)
+    console.log(formatAudit(hits))
+    process.exit(hits.length === 0 ? 0 : 1)
+  }
 
   if (parsed.flags.hook) {
     const result = await runInstalledHook(headConfig)
