@@ -1,4 +1,5 @@
 import { execa } from 'execa'
+import { readFile } from 'node:fs/promises'
 import { gitPathAbsent } from '../core/resolver.js'
 
 function detail(err: unknown): string {
@@ -6,11 +7,17 @@ function detail(err: unknown): string {
   return (stderr || (err as Error).message || 'unknown error').trim()
 }
 
-/** Files changed between `baseRef` and the worktree. A git failure is an error:
- *  an empty list would make every protected test look untouched. */
-export async function getChangedFiles(baseRef: string): Promise<string[]> {
+/** CI audits the commit that was checked out. A local run audits the working tree. */
+export function auditTarget(env: Record<string, string | undefined>): 'HEAD' | 'worktree' {
+  return env.CI ? 'HEAD' : 'worktree'
+}
+
+/** Files changed between `baseRef` and the worktree, or `toRef` when given.
+ *  A git failure is an error: an empty list would make every protected test look untouched. */
+export async function getChangedFiles(baseRef: string, toRef?: string): Promise<string[]> {
   try {
-    const { stdout } = await execa('git', ['diff', '--name-only', baseRef])
+    const args = toRef ? ['diff', '--name-only', baseRef, toRef] : ['diff', '--name-only', baseRef]
+    const { stdout } = await execa('git', args)
     return stdout.split('\n').filter(Boolean)
   } catch (err) {
     throw new Error(
@@ -36,10 +43,28 @@ export async function getFileAtRef(file: string, ref: string): Promise<string> {
   }
 }
 
-/** Worktree paths whose contents contain `needle`, via `git grep`. Exit 1 is
- *  "no hits", not a failure. Anything else aborts the check. */
-export async function listWorktreeFilesContaining(needle: string): Promise<string[]> {
-  const result = await execa('git', ['grep', '-l', '-I', '-F', '-e', needle], { reject: false })
+/** The file as audited: `HEAD` in CI, the working tree locally. `null` means it is absent. */
+export async function readAuditedFile(file: string, target: 'HEAD' | 'worktree'): Promise<string | null> {
+  if (target === 'HEAD') {
+    const text = await getFileAtRef(file, 'HEAD')
+    return text.length > 0 ? text : null
+  }
+  try {
+    return await readFile(file, 'utf-8')
+  } catch {
+    return null
+  }
+}
+
+/** Paths whose contents contain `needle`. Exit 1 is "no hits", not a failure.
+ *  `HEAD` searches the commit; `git grep` prefixes those paths with `HEAD:`. */
+export async function listWorktreeFilesContaining(
+  needle: string,
+  target: 'HEAD' | 'worktree' = 'worktree',
+): Promise<string[]> {
+  const args = ['grep', '-l', '-I', '-F', '-e', needle]
+  if (target === 'HEAD') args.push('HEAD')
+  const result = await execa('git', args, { reject: false })
   if (result.exitCode === 1) return []
   if (result.exitCode !== 0) {
     throw new Error(
@@ -47,5 +72,5 @@ export async function listWorktreeFilesContaining(needle: string): Promise<strin
         (result.stderr || `git grep exited ${result.exitCode}`),
     )
   }
-  return result.stdout.split('\n').filter(Boolean)
+  return result.stdout.split('\n').filter(Boolean).map(path => path.replace(/^HEAD:/, ''))
 }

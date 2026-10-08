@@ -79,6 +79,10 @@ In CI (whenever the `CI` environment variable is set, as it is on GitHub Actions
 
 Outside CI, with no `--base`, the working-tree config is used, so you can try config changes locally.
 
+### Which snapshot is audited
+
+In CI the file list is `git diff --name-only <base> HEAD` and contents are read from `HEAD`. A dirty worktree on the runner cannot hide a weakening or invent one. Locally, `vibecheck check` diffs and reads the working tree, which is the edit about to be committed. `vibecheck check --hook` does not run semantic diff; it only looks at what is staged.
+
 ### What this can't cover
 
 The workflow file is on the PR branch too. A PR can edit `.github/workflows/vibecheck.yml` to skip the step, drop `--base`, or lower `--threshold`. Close that gap in GitHub, not in vibecheck:
