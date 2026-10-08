@@ -1,5 +1,5 @@
 import { execa } from 'execa'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -50,7 +50,9 @@ async function buildHelper(spec: HelperSpec, { toolchain, cacheDir }: HelperOpti
   if (existsSync(binary)) return binary
 
   mkdirSync(cacheDir, { recursive: true })
-  const partial = `${binary}.${process.pid}${suffix}`
+  // Worker threads share a pid, so a pid-only partial collides when two
+  // files compile the same helper at once and one rename throws ENOENT.
+  const partial = `${binary}.${process.pid}.${randomBytes(8).toString('hex')}${suffix}`
   try {
     await spec.build(toolchain, sourceDir, partial)
   } catch (err) {
