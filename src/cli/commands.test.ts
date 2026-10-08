@@ -55,4 +55,8 @@ describe('parseArgs', () => {
   it('parses --base with a ref', () => {
     expect(parseArgs(['check', '--base', 'origin/main'])).toEqual({ command: 'check', flags: { base: 'origin/main' } })
   })
+
+  it('parses check --hook', () => {
+    expect(parseArgs(['check', '--hook'])).toEqual({ command: 'check', flags: { hook: true } })
+  })
 })

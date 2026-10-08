@@ -18,6 +18,7 @@ import type { MutationReport } from '../src/analyzers/mutation.js'
 import { runMutationForLanguages } from '../src/languages/mutation.js'
 import { languageForFile, resolveLanguages } from '../src/languages/registry.js'
 import { getChangedFiles, getFileAtRef, listWorktreeFilesContaining } from '../src/cli/worktree.js'
+import { runInstalledHook } from '../src/hooks/pre-commit.js'
 import { readFile } from 'node:fs/promises'
 
 const USAGE = `Usage: vibecheck <command> [options]
@@ -32,7 +33,8 @@ Options:
   --mutation            Run mutation analysis only
   --semantic            Run semantic diff only
   --threshold <n>       Override the composite score threshold (0-100)
-  --base <ref>          Check against the config at <ref> (default in CI: origin/<protectedBranch>)`
+  --base <ref>          Check against the config at <ref> (default in CI: origin/<protectedBranch>)
+  --hook                Pre-commit mode: staged files and enforcement only`
 
 function goldenSides(tests: ExtractedTest[], file: string): GoldenSide[] {
   return tests.map(test => ({
@@ -74,6 +76,12 @@ async function main() {
   }
 
   const headConfig = await loadConfig()
+
+  if (parsed.flags.hook) {
+    const result = await runInstalledHook(headConfig)
+    if (result.message) console.log(result.message)
+    process.exit(result.exitCode)
+  }
 
   if (parsed.command === 'check' || parsed.command === 'score' || parsed.command === 'report') {
     const resolved = await resolveCheckConfig({ head: headConfig, env: process.env, baseRef: parsed.flags.base })

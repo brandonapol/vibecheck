@@ -5,6 +5,8 @@ export type CliCommand = {
     semantic?: boolean
     threshold?: number
     base?: string
+    /** Pre-commit entry: staged files and enforcement, no analyzers. */
+    hook?: boolean
   }
 }
 
@@ -27,7 +29,7 @@ export function parseArgs(args: string[]): CliCommand {
       flags.threshold = Number(rest[++i])
     } else if (arg === '--base' && i + 1 < rest.length) {
       flags.base = rest[++i]
-    }
+    } else if (arg === '--hook') flags.hook = true
   }
 
   return { command: command as CliCommand['command'], flags }
