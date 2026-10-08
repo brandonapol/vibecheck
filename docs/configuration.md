@@ -1,6 +1,6 @@
 # Configuration
 
-vibecheck is configured via a `vibecheck.config.ts` file at the project root. Run `npx vibecheck init` to generate one with sensible defaults.
+vibecheck is configured via a `vibecheck.config.ts` file at the project root. Run `npx vibecheck init` to generate one with sensible defaults. The CLI loads that file with [jiti](https://github.com/unjs/jiti), so plain Node can run it. You do not need `tsx` or a compiled config.
 
 ## Full Schema
 
