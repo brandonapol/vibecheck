@@ -3,6 +3,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHelperExtractor, type HelperSpec } from './helper.js'
+import { runMutationTest } from './mutation-test.js'
 import type { LanguageAdapter } from './types.js'
 
 /** `package:matcher` and `flutter_test` matchers on the shared scale. A bare
@@ -137,9 +138,10 @@ export function createDartAdapter({
     extractTests: async (source, path) => (await extract(source, path)).tests,
     extractSetup: async (source, path) => (await extract(source, path)).setup,
     assertionStrength: matcher => DART_ASSERTION_STRENGTH[matcher] ?? UNKNOWN_MATCHER_STRENGTH,
+    runMutation: options => runMutationTest(options),
   }
 }
 
 /** Dart and Flutter tests parsed by a helper built from helpers/dart_testast
- *  with the local Dart SDK. No mutation engine yet (#82). */
+ *  with the local Dart SDK. Mutation testing runs mutation_test 1.8.1. */
 export const dartAdapter = createDartAdapter()

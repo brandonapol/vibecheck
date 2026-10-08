@@ -19,7 +19,7 @@ vibecheck layers four complementary checks into a composite integrity score (0-1
 
 | Analyzer | What it catches | Weight |
 |----------|----------------|--------|
-| **Mutation testing** (Stryker, gremlins for Go) | Weak assertions that survive code mutations | 40% |
+| **Mutation testing** (Stryker, gremlins for Go, mutation_test for Dart) | Weak assertions that survive code mutations | 40% |
 | **Hidden test suites** | Tests fitted to implementation instead of spec | 30% |
 | **Property-based tests** | Hardcoded return values | 20% |
 | **Semantic diff analysis** | Retroactive assertion weakening | 10% |
@@ -160,6 +160,8 @@ Assertion strength rankings: `toBe` (10), `toEqual` (9), `toStrictEqual` (10), `
 - Semantic diff as its own gate. CI reads the config from the base branch and fails when that config is weakened.
 - Protected tests, `vibecheck status`, `vibecheck audit`, and an opt-in commit-msg phase tag.
 - Hidden tests. Go and Dart/Flutter semantic diff. Go mutation testing via gremlins.
+
+Dart mutation testing via mutation_test is on main and ships in the next release.
 - GitHub Actions and GitLab CI templates. This repo runs the semantic check and a coverage floor on its own source.
 - `vibecheck.config.ts` loads under plain Node.
 
@@ -167,7 +169,7 @@ Assertion strength rankings: `toBe` (10), `toEqual` (9), `toStrictEqual` (10), `
 
 ## Roadmap
 
-**v0.4.0**: Dart mutation testing, property-based test enforcement, monorepo config
+**v0.4.0**: Property-based test enforcement, monorepo config. Dart mutation testing is already on main and is part of this release.
 
 **v0.5.0**: VS Code extension that marks protected test files
 

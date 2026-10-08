@@ -101,3 +101,21 @@ Status mapping:
 Include paths with no glob (`pkg/math`, `internal/calc`) each get their own `gremlins unleash <package>`. A glob (the default `**/*.go`) is one run of the module, then the report is filtered. `*_test.go` is always dropped. Exclude globs are applied to the report rather than handed to gremlins as regular expressions.
 
 On a pull request (`CI` is set), vibecheck passes `--diff origin/$GITHUB_BASE_REF`, or `origin/<protectedBranch>` when the base ref is not set, and the report is marked `diffScoped`. Local runs mutate the whole module. A diff-scoped score only describes the changed lines, so it is not comparable to a full run.
+
+## Dart (mutation_test)
+
+For Dart, `languages.dart` runs [`mutation_test`](https://pub.dev/packages/mutation_test) 1.8.1 (`dart run mutation_test`). It is not an npm dependency. The package under test needs it as a dev dependency (`mutation_test: 1.8.1`), and `dart` has to be on `PATH`. `languages.dart.mutation.enabled` defaults to true, so listing `dart: {}` runs it. A missing SDK, a failed run with no xunit report, or a report vibecheck cannot parse fails the check. None of those is a score of 100.
+
+vibecheck writes the rules and the input document itself and passes `--rules`. That disables the builtin rules. The rules cover arithmetic, comparison, boolean, and numeric `return` mutations. `return null` is not one of them, because null safety makes it fail to compile. The input document sets `failure="0"`, so mutation_test's own threshold does not decide the run. vibecheck's `threshold` and `perFileThreshold` are the only gate. The report format is xunit.
+
+The default include is `lib/**/*.dart`. `*_test.dart` and anything under a `test` directory are never mutated, so Flutter widget tests are not the mutation targets. Add a path to `languages.dart.mutation.include` to mutate a Dart file outside `lib`.
+
+mutation_test has no diff flag. On a pull request (`CI` is set), vibecheck lists `git diff --name-only --no-renames origin/$GITHUB_BASE_REF HEAD` (or `origin/<protectedBranch>`) and mutates only the selected Dart files. The report is marked `diffScoped`. If none of those files are Dart sources, the score is 100 and the tool is not run. Local runs mutate every selected file.
+
+| xunit | score |
+|-------|--------|
+| testcase with no failure or error | killed |
+| `<error type="timeout">` | killed |
+| `<failure type="undetected">` | survived |
+| `<error type="not covered by tests">` | uncovered (counts against) |
+| any other failure or error | error (not a score) |
