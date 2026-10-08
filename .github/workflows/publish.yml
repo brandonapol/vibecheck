@@ -18,6 +18,14 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
       - run: npm run build
+      # A cold go build compiles the standard library and takes longer than
+      # the test timeout. Compile the helper once so the test run reuses the cache.
+      - name: Warm the Go parser cache
+        working-directory: helpers/go-testast
+        run: |
+          if command -v go >/dev/null 2>&1; then
+            go build -o /tmp/vibecheck-go-testast .
+          fi
       - run: npm test
       - run: npm publish --provenance --access public
         env:
