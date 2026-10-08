@@ -9,4 +9,6 @@ export default defineConfig({
   dts: true,
   clean: true,
   shims: true,
+  // jiti resolves the user's config at runtime and ships its own files.
+  external: ['jiti'],
 })
