@@ -11,7 +11,9 @@ import type { MutationRunOptions } from './types.js'
 /** Arithmetic, comparison, boolean, and numeric return mutations.
  *  `return null` is left out: under null safety it mostly fails to compile.
  *  Passed with --rules, which disables mutation_test's builtin rules, and the
- *  input document sets failure="0" so the tool's own threshold is not a gate. */
+ *  input document sets failure="0" so the tool's own threshold is not a gate.
+ *  The test command gets 180s. A shorter timeout aborts the unmodified-source
+ *  check before a report exists, which is not a score. */
 const RULES = `<?xml version="1.0" encoding="UTF-8"?>
 <mutations version="1.2">
   <rules>
@@ -239,7 +241,7 @@ function inputDocument(files: string[]): string {
 ${listed}
   </files>
   <commands>
-    <command group="test" expected-return="0" timeout="60">dart test</command>
+    <command group="test" expected-return="0" timeout="180">dart test</command>
   </commands>
   <threshold failure="0"/>
 </mutations>
@@ -287,7 +289,7 @@ export async function runMutationTest(
     const inputPath = join(dir, 'input.xml')
     await writeFile(rulesPath, RULES)
     await writeFile(inputPath, inputDocument(files))
-    let result: { exitCode?: number; stderr?: string }
+    let result: { exitCode?: number; stderr?: string; stdout?: string }
     try {
       result = await execa(
         dart,
@@ -307,8 +309,10 @@ export async function runMutationTest(
       xml = await readFile(reportPath, 'utf8')
     } catch {
       const stderr = (result.stderr || '').trim()
+      const stdout = (result.stdout || '').trim()
+      const detail = [stderr, stdout].filter(Boolean).join('\n')
       throw new Error(
-        `mutation_test failed: ${stderr || `exit ${result.exitCode}`}. A failed run is not a mutation score.`,
+        `mutation_test failed: ${detail || `exit ${result.exitCode}`}. A failed run is not a mutation score.`,
       )
     }
     const report = parseMutationTestReport(xml, filter)
