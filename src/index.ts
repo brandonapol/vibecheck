@@ -26,6 +26,7 @@ export { detectGoldenUpdates, resolveRelatedFile, extraGoldenTestFiles } from '.
 export type { GoldenSide } from './analyzers/golden-diff.js'
 export { formatReport } from './reporters/console.js'
 export { runCheck } from './cli/runner.js'
+export { classifyStaged, runPreCommit } from './hooks/pre-commit.js'
 export { checkProtectedTests, isProtectedTestFile } from './analyzers/protected-tests.js'
 export type { ProtectedTestViolation } from './analyzers/protected-tests.js'
 export { detectConfigWeakening } from './analyzers/config-diff.js'
