@@ -107,6 +107,12 @@ type WeakeningPattern =
   | 'assertion-count-reduction'
   | 'tautological-assertion'
   | 'weak-new-test'
+  | 'suspicious-assertion'
+  | 'assertion-changed'
+  | 'test-body-changed'
+  | 'setup-changed'
+  | 'assertion-neutralized'
+  | 'golden-updated'
 ```
 
 ### `ASSERTION_STRENGTH`

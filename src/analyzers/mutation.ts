@@ -1,5 +1,6 @@
 import { execa } from 'execa'
-import { readFile } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 
 export type MutationConfig = {
   enabled: boolean
@@ -128,14 +129,32 @@ export function checkMutationThresholds(
 
 const STRYKER_REPORT_PATH = '.stryker-output/report.json'
 
-export async function runMutationAnalysis(config: MutationConfig): Promise<CountedMutationReport> {
-  await execa('npx', [
-    'stryker', 'run',
+/** The unscoped `stryker` package on npm is an abandoned pre-2019 tool.
+ *  `npx stryker` with nothing installed locally installs that, not
+ *  `@stryker-mutator/core`. Only a project-local binary is acceptable. */
+export async function resolveStrykerBin(cwd: string): Promise<string> {
+  const bin = join(cwd, 'node_modules', '.bin', process.platform === 'win32' ? 'stryker.cmd' : 'stryker')
+  try {
+    await access(bin)
+    return bin
+  } catch {
+    throw new Error(
+      `Stryker is not installed in this project (looked for ${bin}). ` +
+        'Install @stryker-mutator/core and a runner (for example @stryker-mutator/vitest-runner). ' +
+        'Do not use the unscoped `stryker` package: `npx stryker` resolves to the abandoned stryker@1.0.1 tool.',
+    )
+  }
+}
+
+export async function runMutationAnalysis(config: MutationConfig, cwd = process.cwd()): Promise<CountedMutationReport> {
+  const bin = await resolveStrykerBin(cwd)
+  await execa(bin, [
+    'run',
     '--reporters', 'json',
     '--jsonReporter.fileName', STRYKER_REPORT_PATH,
-  ])
+  ], { cwd })
 
-  const raw = await readFile(STRYKER_REPORT_PATH, 'utf-8')
+  const raw = await readFile(join(cwd, STRYKER_REPORT_PATH), 'utf-8')
   const report: StrykerReport = JSON.parse(raw)
   return extractScores(report)
 }

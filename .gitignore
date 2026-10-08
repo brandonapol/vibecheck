@@ -6,6 +6,7 @@ dist/
 
 # Test
 coverage/
+scratch/
 
 # OS
 .DS_Store

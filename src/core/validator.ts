@@ -1,6 +1,5 @@
 import type { Config } from '../config/schema.js'
 import { detectAgent, detectAgentTrailers, type AgentIdentity } from './detector.js'
-import { matchesPatterns } from './resolver.js'
 
 export type Violation = {
   file: string
@@ -46,12 +45,9 @@ export async function validate(config: Config, options: ValidateOptions): Promis
 
   if (protectedFiles.length === 0) return { ok: true }
 
-  const implFiles = staged.filter(
-    f => !matchesPatterns(f, config.testPatterns) && /\.(ts|tsx|js|jsx)$/.test(f),
-  )
-
-  if (implFiles.length === 0) return { ok: true }
-
+  // Any edit to a test that already exists on the protected branch is a
+  // violation on its own. Requiring an implementation file in the same commit
+  // lets an agent weaken tests in one commit and land the code in the next.
   const violations: Violation[] = protectedFiles.map(file => ({
     file,
     reason: 'protected-test-modified' as const,

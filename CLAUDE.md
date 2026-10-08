@@ -54,6 +54,8 @@ templates/
 - Tests live next to source: `src/core/resolver.test.ts` alongside `src/core/resolver.ts`.
 - Mock git commands via execa — don't require a real git repo in unit tests.
 - Integration tests that need a real repo go in `test/integration/` and can create temp git repos.
+- Never pass `--root /` (or any root above this repo) to vitest. The file filter is resolved from `root`, so `--root /` makes Vite walk the entire filesystem and can exhaust the V8 heap.
+- To probe an analyzer, run a plain script (`npx tsx scratch/probe.ts`) or put the probe under `scratch/` (gitignored) and run `npx vitest run scratch/probe.test.ts` from the repo root. `vitest.config.ts` pins `root` and `include`, but a CLI `--root` still overrides it.
 
 ## MVP scope (v0.1.0)
 

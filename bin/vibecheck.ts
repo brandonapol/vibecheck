@@ -7,10 +7,17 @@ import { loadConfig } from '../src/config/loader.js'
 import { resolveCheckConfig } from '../src/cli/config-source.js'
 import { checkProtectedTests, isProtectedTestFile, type ProtectedTestViolation } from '../src/analyzers/protected-tests.js'
 import { detectWeakeningWithAdapter, type WeakeningViolation } from '../src/analyzers/semantic-diff.js'
+import {
+  detectGoldenUpdates,
+  extraGoldenTestFiles,
+  resolveRelatedFile,
+  type GoldenSide,
+} from '../src/analyzers/golden-diff.js'
+import type { ExtractedTest } from '../src/analyzers/test-ast.js'
 import type { MutationReport } from '../src/analyzers/mutation.js'
 import { runMutationForLanguages } from '../src/languages/mutation.js'
 import { languageForFile, resolveLanguages } from '../src/languages/registry.js'
-import { execa } from 'execa'
+import { getChangedFiles, getFileAtRef, listWorktreeFilesContaining } from '../src/cli/worktree.js'
 import { readFile } from 'node:fs/promises'
 
 const USAGE = `Usage: vibecheck <command> [options]
@@ -27,22 +34,13 @@ Options:
   --threshold <n>       Override the composite score threshold (0-100)
   --base <ref>          Check against the config at <ref> (default in CI: origin/<protectedBranch>)`
 
-async function getChangedFiles(baseBranch: string): Promise<string[]> {
-  try {
-    const { stdout } = await execa('git', ['diff', '--name-only', baseBranch])
-    return stdout.split('\n').filter(Boolean)
-  } catch {
-    return []
-  }
-}
-
-async function getFileContent(file: string, branch: string): Promise<string> {
-  try {
-    const { stdout } = await execa('git', ['show', `${branch}:${file}`])
-    return stdout
-  } catch {
-    return ''
-  }
+function goldenSides(tests: ExtractedTest[], file: string): GoldenSide[] {
+  return tests.map(test => ({
+    id: test.id,
+    assertionKeys: test.assertions.map(assertion => assertion.key).sort(),
+    bodyKey: test.bodyKey,
+    relatedFiles: (test.relatedFiles ?? []).map(raw => resolveRelatedFile(file, raw)),
+  }))
 }
 
 async function main() {
@@ -106,14 +104,31 @@ async function main() {
 
     if (runSemantic || checkProtected) {
       const languages = resolveLanguages(config)
-      for (const file of changedFiles) {
+      const files = [...changedFiles]
+      if (runSemantic && changedFiles.some(file => /\.(png|gif|jpe?g|webp)$/i.test(file))) {
+        const hits = await listWorktreeFilesContaining('matchesGoldenFile')
+        files.push(...extraGoldenTestFiles(changedFiles, hits))
+      }
+      for (const file of files) {
         if (!runSemantic && !isProtectedTestFile(file, config)) continue
         const language = languageForFile(file, languages)
         if (!language) continue
-        const before = await getFileContent(file, compareRef)
+        const before = await getFileAtRef(file, compareRef)
         const after = await readFile(file, 'utf-8').catch(() => '')
         if (before && after) {
           semanticViolations.push(...(await detectWeakeningWithAdapter(before, after, file, language.adapter)))
+          if (runSemantic) {
+            const [beforeTests, afterTests] = await Promise.all([
+              language.adapter.extractTests(before, file),
+              language.adapter.extractTests(after, file),
+            ])
+            semanticViolations.push(...detectGoldenUpdates({
+              file,
+              before: goldenSides(beforeTests, file),
+              after: goldenSides(afterTests, file),
+              changedFiles,
+            }))
+          }
         }
       }
     }
@@ -123,7 +138,7 @@ async function main() {
         config,
         changedFiles,
         semanticViolations,
-        readBase: async file => (await getFileContent(file, compareRef)) || null,
+        readBase: async file => (await getFileAtRef(file, compareRef)) || null,
         readHead: async file => readFile(file, 'utf-8').catch(() => null),
       })
     }
@@ -136,6 +151,7 @@ async function main() {
       semanticViolations,
       configViolations: resolved.configViolations,
       protectedViolations,
+      ran: { mutation: runMutation, semanticDiff: runSemantic },
     })
 
     if (parsed.command === 'score') {

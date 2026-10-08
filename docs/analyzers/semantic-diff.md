@@ -65,6 +65,8 @@ Dart test files (`*_test.dart`) are parsed by a helper written in Dart (`helpers
 
 **Flutter weakening** falls out of the same comparison. Loosening a finder (`findsOneWidget` → `findsWidgets` → `findsAny`) is a `precision-reduction`. Deleting a `findsNothing` check is an `assertion-count-reduction`. Swapping `pump(duration)` for `pumpAndSettle()` changes the test body, so it's a `test-body-changed`.
 
+**Golden files.** `matchesGoldenFile('goldens/x.png')` is an expected value stored next to the test. The helper records string-literal paths; vibecheck resolves them relative to the test file. `golden-updated` fires when an existing test still pins an image whose bytes changed in this diff (the test's assertions and inputs held still, or a non-test file under `lib/` changed with it), and when an existing test is retargeted from one golden path to another. A golden added only by a new test is not a violation. A path that is not a string literal is not tracked.
+
 **Conditional**: inside an `if`, a ternary, the right side of `&&`/`||`/`??`, a `for` over anything but a non-empty list literal, a `while`, a `switch` case, or a `try` whose `catch` doesn't rethrow. Callbacks (`forEach`, `then`) aren't conditional.
 
 **Setup**: top-level declarations other than `main`, and every statement in `main` or a group body that isn't a test or group (`setUp`, `tearDown`, `late` variables).

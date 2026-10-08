@@ -1,6 +1,6 @@
 # CI Integration
 
-vibecheck is designed to run in CI as the enforcement backstop. Pre-commit hooks are local safeguards that can be bypassed; CI cannot.
+vibecheck is designed to run in CI as the enforcement backstop. Pre-commit hooks are local safeguards that can be bypassed; CI cannot. What has to be true of the repository for that backstop to hold is in [Threat model](threat-model.md).
 
 ## GitHub Actions
 

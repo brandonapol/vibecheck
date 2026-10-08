@@ -62,6 +62,7 @@ nav:
   - Scoring: scoring.md
   - Pre-commit Hook: pre-commit.md
   - CI Integration: ci.md
+  - Threat Model: threat-model.md
   - CLAUDE.md Template: claude-template.md
   - Adversarial Testing: adversarial.md
   - API Reference: api.md

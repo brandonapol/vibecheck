@@ -25,6 +25,7 @@ const weakeningPattern = z.enum([
   'test-body-changed',
   'setup-changed',
   'assertion-neutralized',
+  'golden-updated',
 ])
 
 const semanticDiffSchema = z
@@ -46,6 +47,7 @@ const semanticDiffSchema = z
         'test-body-changed',
         'setup-changed',
         'assertion-neutralized',
+        'golden-updated',
       ]),
     enforcement: z.enum(['block', 'warn', 'comment']).default('block'),
   })
