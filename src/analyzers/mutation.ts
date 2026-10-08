@@ -1,4 +1,5 @@
 import { execa } from 'execa'
+import { readFileSync } from 'node:fs'
 import { access, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -165,7 +166,25 @@ export function checkMutationThresholds(
   return violations.length === 0 ? { ok: true } : { ok: false, violations }
 }
 
-const STRYKER_REPORT_PATH = '.stryker-output/report.json'
+/** Stryker 10's default. Older releases used the same path unless a config overrode it. */
+const DEFAULT_STRYKER_REPORT = 'reports/mutation/mutation.json'
+
+const STRYKER_CONFIG_FILES = ['stryker.config.json', 'stryker.conf.json', '.stryker.config.json', '.stryker.conf.json']
+
+/** `--jsonReporter.fileName` was removed from the Stryker CLI. The report path
+ *  lives in the JSON config, and otherwise falls back to Stryker's default. */
+export function strykerReportPath(cwd: string): string {
+  for (const name of STRYKER_CONFIG_FILES) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(cwd, name), 'utf-8')) as { jsonReporter?: { fileName?: unknown } }
+      const fileName = parsed.jsonReporter?.fileName
+      if (typeof fileName === 'string' && fileName.length > 0) return fileName
+    } catch {
+      // Absent, unreadable, or not JSON. A JS config is not evaluated.
+    }
+  }
+  return DEFAULT_STRYKER_REPORT
+}
 
 /** The unscoped `stryker` package on npm is an abandoned pre-2019 tool.
  *  `npx stryker` with nothing installed locally installs that, not
@@ -186,13 +205,11 @@ export async function resolveStrykerBin(cwd: string): Promise<string> {
 
 export async function runMutationAnalysis(config: MutationConfig, cwd = process.cwd()): Promise<CountedMutationReport> {
   const bin = await resolveStrykerBin(cwd)
-  await execa(bin, [
-    'run',
-    '--reporters', 'json',
-    '--jsonReporter.fileName', STRYKER_REPORT_PATH,
-  ], { cwd })
+  // `--jsonReporter.fileName` is not a Stryker 10 option. Passing it makes
+  // current releases exit before any mutant runs.
+  await execa(bin, ['run', '--reporters', 'json'], { cwd })
 
-  const raw = await readFile(join(cwd, STRYKER_REPORT_PATH), 'utf-8')
+  const raw = await readFile(join(cwd, strykerReportPath(cwd)), 'utf-8')
   const report: StrykerReport = JSON.parse(raw)
   return extractScores(report)
 }
