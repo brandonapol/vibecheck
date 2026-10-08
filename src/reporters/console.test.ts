@@ -60,6 +60,16 @@ describe('formatReport', () => {
     expect(output).toContain('precision-reduction')
   })
 
+  it('labels an analyzer that did not run as skipped', () => {
+    const score: IntegrityScore = {
+      total: 100,
+      components: { semanticDiff: 100 },
+    }
+    const output = formatReport(score, 80, { skipped: { mutation: true } })
+    expect(output).toContain('Mutation Score:       — (skipped)')
+    expect(output).not.toContain('100% (threshold')
+  })
+
   it('omits disabled components', () => {
     const score: IntegrityScore = {
       total: 90,

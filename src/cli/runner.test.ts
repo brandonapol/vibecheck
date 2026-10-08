@@ -80,6 +80,35 @@ describe('runCheck', () => {
     expect(result.score.components.semanticDiff).toBeUndefined()
   })
 
+  it('does not count a skipped mutation run as a perfect score', async () => {
+    const config = makeConfig()
+    const result = await runCheck(config, {
+      mutationScore: 100,
+      semanticViolations: [],
+      ran: { mutation: false, semanticDiff: true },
+    })
+
+    expect(result.score.components.mutation).toBeUndefined()
+    expect(result.score.components.semanticDiff).toBe(100)
+    expect(result.report).toContain('Mutation Score:       — (skipped)')
+    expect(result.pass).toBe(true)
+  })
+
+  it('does not count a skipped semantic run as clean', async () => {
+    const config = makeConfig()
+    const result = await runCheck(config, {
+      mutationScore: 90,
+      semanticViolations: [
+        { file: 'a.test.ts', pattern: 'test-deletion', detail: 'deleted' },
+      ],
+      ran: { mutation: true, semanticDiff: false },
+    })
+
+    expect(result.score.components.semanticDiff).toBeUndefined()
+    expect(result.report).toContain('Semantic Diff:        — (skipped)')
+    expect(result.pass).toBe(true)
+  })
+
   it('includes formatted report in output', async () => {
     const config = makeConfig()
     const result = await runCheck(config, {

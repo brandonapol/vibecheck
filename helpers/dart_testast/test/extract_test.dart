@@ -92,6 +92,19 @@ void main() {
     ]);
   });
 
+  test('records literal golden paths and skips a computed one', () {
+    final result = extract('''
+void main() {
+  testWidgets('renders', (tester) async {
+    await expectLater(find.byType(X), matchesGoldenFile('goldens/x.png'));
+    await expectLater(find.byType(Y), matchesGoldenFile(name));
+    await expectLater(find.byType(X), matchesGoldenFile('goldens/x.png'));
+  });
+}
+''');
+    expect(find(result, 'renders')['relatedFiles'], ['goldens/x.png']);
+  });
+
   test('marks which matchers carry an expected value', () {
     final a = assertions(
       find(
