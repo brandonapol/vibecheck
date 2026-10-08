@@ -10,6 +10,8 @@ The semantic diff analyzer detects assertion weakening between commits. When an 
 4. Compare the **sorted multiset** of assertion strengths rank by rank: reordering assertions is not weakening, and padding with weak assertions cannot hide a removed strong one
 5. Anything the AST cannot statically resolve — like `expect(x)[method]()` — fails closed as a `suspicious-assertion` violation
 
+Deleting a whole test file reports `test-deletion` for every test that was in it. The empty side is not sent to the language parser: Go and Dart reject an empty file, and that error would hide the deletion. A file that does not exist on the base ref is not compared.
+
 ## Go
 
 Go test files (`*_test.go`) are parsed by a small helper written in Go (`helpers/go-testast`, built with `go/ast`). It's compiled with your Go toolchain on first use and cached in the OS temp directory, keyed by a hash of its source. If Go is missing or a file doesn't parse, the check fails rather than passing.
