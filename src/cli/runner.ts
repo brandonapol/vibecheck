@@ -4,6 +4,7 @@ import type { WeakeningViolation } from '../analyzers/semantic-diff.js'
 import type { ConfigWeakeningViolation } from '../analyzers/config-diff.js'
 import type { ProtectedTestViolation } from '../analyzers/protected-tests.js'
 import type { TamperViolation } from '../analyzers/tamper.js'
+import type { HiddenTestReport } from '../analyzers/hidden-tests.js'
 import { calculateScore, type AnalyzerResults, type Weights } from '../core/score.js'
 import { formatReport } from '../reporters/console.js'
 
@@ -17,9 +18,11 @@ export type AnalyzerInputs = {
   protectedViolations?: ProtectedTestViolation[]
   /** Hook, Stryker-comment, and test-runner drift. Non-blocking entries are reported only. */
   tamperViolations?: TamperViolation[]
+  /** Holdout suite. Omitted when hidden tests did not run. */
+  hidden?: HiddenTestReport
   /** Which analyzers actually ran. Omitted means ran, so a bare score still counts.
    *  A skipped analyzer must not be reported as a perfect score. */
-  ran?: { mutation?: boolean; semanticDiff?: boolean }
+  ran?: { mutation?: boolean; semanticDiff?: boolean; hiddenTests?: boolean }
 }
 
 export type CheckResult = {
@@ -43,6 +46,7 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
   const enabledPatterns = new Set(config.semanticDiff.patterns)
   const mutationRan = inputs.ran?.mutation ?? true
   const semanticRan = inputs.ran?.semanticDiff ?? true
+  const hiddenRan = inputs.ran?.hiddenTests ?? true
   const semanticViolations = config.semanticDiff.enabled && semanticRan
     ? inputs.semanticViolations.filter(v => enabledPatterns.has(v.pattern))
     : []
@@ -58,8 +62,8 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
       enabled: config.semanticDiff.enabled && semanticRan,
     },
     hiddenTests: {
-      passRate: 0,
-      enabled: false,
+      passRate: inputs.hidden?.passRate ?? 0,
+      enabled: config.hiddenTests.enabled && hiddenRan,
     },
     propertyTests: {
       coverage: 0,
@@ -93,6 +97,17 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
     failures.push(`${semanticViolations.length} assertion weakening violation(s) with enforcement 'block'`)
   }
 
+  if (config.hiddenTests.enabled && hiddenRan && config.hiddenTests.enforcement === 'block') {
+    const hidden = inputs.hidden
+    if (!hidden || hidden.total === 0) {
+      failures.push('Hidden tests ran no tests')
+    } else if (hidden.passRate < config.hiddenTests.threshold) {
+      failures.push(
+        `Hidden tests pass rate ${round(hidden.passRate)}% is below the threshold of ${config.hiddenTests.threshold}%`,
+      )
+    }
+  }
+
   for (const v of inputs.protectedViolations ?? []) {
     failures.push(`Protected test — ${v.file}: ${v.detail}`)
   }
@@ -113,11 +128,14 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
     configViolations: inputs.configViolations,
     protectedViolations: inputs.protectedViolations,
     tamperViolations: inputs.tamperViolations,
+    hiddenThreshold: config.hiddenTests.enabled ? config.hiddenTests.threshold : undefined,
+    hiddenFailures: inputs.hidden?.failures,
     pass,
     failures,
     skipped: {
       mutation: config.mutation.enabled && !mutationRan,
       semanticDiff: config.semanticDiff.enabled && !semanticRan,
+      hiddenTests: config.hiddenTests.enabled && !hiddenRan,
     },
   })
 

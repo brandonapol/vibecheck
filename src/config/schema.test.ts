@@ -90,6 +90,10 @@ describe('configSchema', () => {
     expect(result.hiddenTests.source).toBe('repo')
     if (result.hiddenTests.source === 'repo') {
       expect(result.hiddenTests.url).toBe('git@github.com:org/hidden-tests.git')
+      expect(result.hiddenTests.branch).toBe('main')
+      expect(result.hiddenTests.tool).toBe('vitest')
+      expect(result.hiddenTests.threshold).toBe(100)
+      expect(result.hiddenTests.enforcement).toBe('block')
     }
   })
 

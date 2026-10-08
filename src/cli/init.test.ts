@@ -37,6 +37,20 @@ describe('scaffoldProject', () => {
     expect(result.configCreated).toBe(false)
   })
 
+  it('gitignores the hidden directory and the clone cache', async () => {
+    const result = await scaffoldProject(tmpDir)
+    const ignore = readFileSync(join(tmpDir, '.gitignore'), 'utf-8')
+    expect(ignore).toContain('.vibecheck-hidden/')
+    expect(ignore).toContain('.vibecheck-cache/')
+    expect(result.hiddenDirCreated).toBe(true)
+
+    writeFileSync(join(tmpDir, '.gitignore'), `${ignore}other\n`)
+    await scaffoldProject(tmpDir)
+    const again = readFileSync(join(tmpDir, '.gitignore'), 'utf-8')
+    expect(again.match(/\.vibecheck-hidden\//g)).toHaveLength(1)
+    expect(again).toContain('other')
+  })
+
   it('creates hidden test directory', async () => {
     const result = await scaffoldProject(tmpDir)
     expect(existsSync(join(tmpDir, '.vibecheck-hidden'))).toBe(true)

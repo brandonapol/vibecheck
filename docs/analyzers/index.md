@@ -10,7 +10,7 @@ vibecheck uses multiple analyzers that each target a different class of test eva
 | [Semantic Diff](semantic-diff.md) | Retroactive assertion weakening between commits | 10% | Implemented |
 | [Config Weakening](config-weakening.md) | Threshold reductions and analyzer disabling | n/a | Implemented |
 | Tamper | Hook deletion, `Stryker disable` comments, narrowed test-runner globs | n/a | Implemented |
-| Hidden Tests | Tests fitted to implementation instead of spec | 30% | Planned |
+| [Hidden Tests](hidden-tests.md) | Tests fitted to implementation instead of spec | 30% | Implemented |
 | Property Tests | Hardcoded return values that pass example-based tests | 20% | Planned |
 
 ## How They Compose

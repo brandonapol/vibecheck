@@ -24,6 +24,7 @@ This effectively disarms vibecheck without modifying any test code. The config w
 | Enforcement downgrade | `'block'` to `'warn'` or `'comment'` |
 | Exclude list expansion | Adding entries to `mutation.exclude` |
 | Include list shrinkage | Removing entries from `mutation.include` |
+| Hidden tests weakened | Disabling them, lowering `hiddenTests.threshold`, `block` to `warn`, or changing `source` / `path` / `url` / `branch` |
 
 ## What It Allows
 

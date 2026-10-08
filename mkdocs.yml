@@ -59,6 +59,7 @@ nav:
       - Mutation Testing: analyzers/mutation.md
       - Semantic Diff: analyzers/semantic-diff.md
       - Config Weakening: analyzers/config-weakening.md
+      - Hidden Tests: analyzers/hidden-tests.md
   - Scoring: scoring.md
   - Pre-commit Hook: pre-commit.md
   - CI Integration: ci.md

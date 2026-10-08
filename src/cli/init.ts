@@ -85,6 +85,8 @@ export async function scaffoldProject(cwd: string): Promise<InitResult> {
     result.hiddenDirCreated = true
   }
 
+  ensureGitignore(cwd)
+
   const workflowDir = join(cwd, '.github', 'workflows')
   const workflowPath = join(workflowDir, 'vibecheck.yml')
   if (existsSync(workflowDir) && !existsSync(workflowPath)) {
@@ -178,6 +180,17 @@ export function installHook(cwd: string): HookInstall {
   return writeHook(join(dir, 'pre-commit'), '.git/hooks/pre-commit')
 }
 
+function ensureGitignore(cwd: string): void {
+  const path = join(cwd, '.gitignore')
+  const required = ['.vibecheck-hidden/', '.vibecheck-cache/']
+  const existing = existsSync(path) ? readFileSync(path, 'utf-8') : ''
+  const present = new Set(existing.split('\n').map(line => line.trim()))
+  const missing = required.filter(line => !present.has(line))
+  if (missing.length === 0) return
+  const body = existing.length === 0 || existing.endsWith('\n') ? existing : `${existing}\n`
+  writeFileSync(path, `${body}${missing.join('\n')}\n`)
+}
+
 function getInlineWorkflowTemplate(): string {
   return `name: Vibecheck Test Integrity
 
@@ -197,6 +210,15 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
+      - name: Load hidden-tests deploy key
+        env:
+          HIDDEN_KEY: \${{ secrets.hidden-tests-deploy-key }}
+        run: |
+          if [ -n "$HIDDEN_KEY" ]; then
+            install -m 600 /dev/null "$RUNNER_TEMP/vibecheck-hidden-key"
+            printf '%s\\n' "$HIDDEN_KEY" > "$RUNNER_TEMP/vibecheck-hidden-key"
+            echo "VIBECHECK_HIDDEN_TESTS_KEY=$RUNNER_TEMP/vibecheck-hidden-key" >> "$GITHUB_ENV"
+          fi
       - run: npx vibecheck check
 `
 }

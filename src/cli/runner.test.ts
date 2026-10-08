@@ -173,4 +173,87 @@ describe('runCheck', () => {
     })
     expect(failing.pass).toBe(false)
   })
+
+  it('puts the hidden-test pass rate in the score and fails when it is below the threshold', async () => {
+    const config = makeConfig({
+      hiddenTests: {
+        enabled: true,
+        source: 'directory',
+        path: '.vibecheck-hidden',
+        tool: 'vitest',
+        threshold: 100,
+        enforcement: 'block',
+      },
+    })
+    const result = await runCheck(config, {
+      mutationScore: 100,
+      semanticViolations: [],
+      hidden: { passRate: 50, passed: 1, failed: 1, skipped: 0, total: 2, failures: ['holdout fails'] },
+    })
+    expect(result.score.components.hiddenTests).toBe(50)
+    expect(result.pass).toBe(false)
+    expect(result.failures.some(line => line.includes('50%'))).toBe(true)
+    expect(result.report).toContain('holdout fails')
+  })
+
+  it('does not fail the check when hidden-test enforcement is warn', async () => {
+    const config = makeConfig({
+      hiddenTests: {
+        enabled: true,
+        source: 'directory',
+        path: '.vibecheck-hidden',
+        tool: 'vitest',
+        threshold: 100,
+        enforcement: 'warn',
+      },
+    })
+    const result = await runCheck(config, {
+      mutationScore: 100,
+      semanticViolations: [],
+      hidden: { passRate: 50, passed: 1, failed: 1, skipped: 0, total: 2, failures: [] },
+    })
+    expect(result.pass).toBe(true)
+    expect(result.score.components.hiddenTests).toBe(50)
+  })
+
+  it('fails closed when the hidden suite ran no tests', async () => {
+    const config = makeConfig({
+      hiddenTests: {
+        enabled: true,
+        source: 'directory',
+        path: '.vibecheck-hidden',
+        tool: 'vitest',
+        threshold: 100,
+        enforcement: 'block',
+      },
+    })
+    const result = await runCheck(config, {
+      mutationScore: 100,
+      semanticViolations: [],
+      hidden: { passRate: 0, passed: 0, failed: 0, skipped: 0, total: 0, failures: [] },
+    })
+    expect(result.pass).toBe(false)
+    expect(result.failures).toContain('Hidden tests ran no tests')
+  })
+
+  it('does not count a skipped hidden-test run as a score', async () => {
+    const config = makeConfig({
+      hiddenTests: {
+        enabled: true,
+        source: 'directory',
+        path: '.vibecheck-hidden',
+        tool: 'vitest',
+        threshold: 100,
+        enforcement: 'block',
+      },
+    })
+    const result = await runCheck(config, {
+      mutationScore: 100,
+      semanticViolations: [],
+      ran: { mutation: true, semanticDiff: true, hiddenTests: false },
+    })
+    expect(result.score.components.hiddenTests).toBeUndefined()
+    expect(result.report).toContain('Hidden Tests:         — (skipped)')
+    expect(result.pass).toBe(true)
+  })
 })
