@@ -7,12 +7,8 @@ import { loadConfig } from '../src/config/loader.js'
 import { resolveCheckConfig } from '../src/cli/config-source.js'
 import { checkProtectedTests, isProtectedTestFile, type ProtectedTestViolation } from '../src/analyzers/protected-tests.js'
 import { detectWeakeningWithAdapter, type WeakeningViolation } from '../src/analyzers/semantic-diff.js'
-import {
-  detectGoldenUpdates,
-  extraGoldenTestFiles,
-  resolveRelatedFile,
-  type GoldenSide,
-} from '../src/analyzers/golden-diff.js'
+import { detectGoldenUpdates, extraGoldenTestFiles, resolveRelatedFile, type GoldenSide } from '../src/analyzers/golden-diff.js'
+import { detectTamper, tamperCandidate, type TamperViolation } from '../src/analyzers/tamper.js'
 import type { ExtractedTest } from '../src/analyzers/test-ast.js'
 import type { MutationReport } from '../src/analyzers/mutation.js'
 import { runMutationForLanguages } from '../src/languages/mutation.js'
@@ -98,9 +94,11 @@ async function main() {
     let mutationScore = 100
     let mutationReport: MutationReport | undefined = undefined
     const semanticViolations: WeakeningViolation[] = []
+    let tamperViolations: TamperViolation[] = []
 
     const runMutation = parsed.flags.mutation || (!parsed.flags.semantic && config.mutation.enabled)
     const runSemantic = parsed.flags.semantic || (!parsed.flags.mutation && config.semanticDiff.enabled)
+    const runTamper = !parsed.flags.mutation || parsed.flags.semantic === true
 
     if (runMutation) {
       try {
@@ -115,7 +113,7 @@ async function main() {
     // Protected tests are diffed even when semantic diff is off or not asked for.
     const { files: protectedFiles, required } = config.protectedTests
     const checkProtected = !parsed.flags.mutation && protectedFiles.length + required.length > 0
-    const changedFiles = runSemantic || checkProtected ? await getChangedFiles(compareRef) : []
+    const changedFiles = runSemantic || checkProtected || runTamper ? await getChangedFiles(compareRef) : []
     let protectedViolations: ProtectedTestViolation[] = []
 
     if (runSemantic || checkProtected) {
@@ -149,6 +147,19 @@ async function main() {
       }
     }
 
+    if (runTamper && changedFiles.length > 0) {
+      const changes = []
+      for (const file of changedFiles) {
+        if (!tamperCandidate(file)) continue
+        changes.push({
+          file,
+          before: await getFileAtRef(file, compareRef),
+          after: await readFile(file, 'utf-8').catch(() => ''),
+        })
+      }
+      tamperViolations = detectTamper(changes)
+    }
+
     if (checkProtected) {
       protectedViolations = await checkProtectedTests({
         config,
@@ -167,6 +178,7 @@ async function main() {
       semanticViolations,
       configViolations: resolved.configViolations,
       protectedViolations,
+      tamperViolations,
       ran: { mutation: runMutation, semanticDiff: runSemantic },
     })
 

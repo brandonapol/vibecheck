@@ -3,6 +3,7 @@ import { checkMutationThresholds, type MutationReport } from '../analyzers/mutat
 import type { WeakeningViolation } from '../analyzers/semantic-diff.js'
 import type { ConfigWeakeningViolation } from '../analyzers/config-diff.js'
 import type { ProtectedTestViolation } from '../analyzers/protected-tests.js'
+import type { TamperViolation } from '../analyzers/tamper.js'
 import { calculateScore, type AnalyzerResults, type Weights } from '../core/score.js'
 import { formatReport } from '../reporters/console.js'
 
@@ -14,6 +15,8 @@ export type AnalyzerInputs = {
   configViolations?: ConfigWeakeningViolation[]
   /** Findings in protected tests; any entry fails, whatever the enforcement. */
   protectedViolations?: ProtectedTestViolation[]
+  /** Hook, Stryker-comment, and test-runner drift. Non-blocking entries are reported only. */
+  tamperViolations?: TamperViolation[]
   /** Which analyzers actually ran. Omitted means ran, so a bare score still counts.
    *  A skipped analyzer must not be reported as a perfect score. */
   ran?: { mutation?: boolean; semanticDiff?: boolean }
@@ -94,6 +97,10 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
     failures.push(`Protected test — ${v.file}: ${v.detail}`)
   }
 
+  for (const v of inputs.tamperViolations ?? []) {
+    if (v.blocking) failures.push(`Tamper — ${v.file}: ${v.detail}`)
+  }
+
   for (const v of inputs.configViolations ?? []) {
     failures.push(`Config weakening — ${v.field}: ${v.detail}`)
   }
@@ -105,6 +112,7 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
     semanticDiff: semanticViolations.length > 0 ? semanticViolations : undefined,
     configViolations: inputs.configViolations,
     protectedViolations: inputs.protectedViolations,
+    tamperViolations: inputs.tamperViolations,
     pass,
     failures,
     skipped: {

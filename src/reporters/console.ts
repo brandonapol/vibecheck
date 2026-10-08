@@ -3,6 +3,7 @@ import type { MutationReport } from '../analyzers/mutation.js'
 import type { WeakeningViolation } from '../analyzers/semantic-diff.js'
 import type { ConfigWeakeningViolation } from '../analyzers/config-diff.js'
 import type { ProtectedTestViolation } from '../analyzers/protected-tests.js'
+import type { TamperViolation } from '../analyzers/tamper.js'
 
 type ReportDetails = {
   mutation?: MutationReport
@@ -11,6 +12,7 @@ type ReportDetails = {
   semanticDiff?: WeakeningViolation[]
   configViolations?: ConfigWeakeningViolation[]
   protectedViolations?: ProtectedTestViolation[]
+  tamperViolations?: TamperViolation[]
   /** The overall verdict when gates other than the score decide it. */
   pass?: boolean
   failures?: string[]
@@ -71,6 +73,14 @@ export function formatReport(
     lines.push('  Protected tests changed:')
     for (const v of details.protectedViolations) {
       lines.push(`    ${v.file} — ${v.rule}: ${v.detail}`)
+    }
+  }
+
+  if (details.tamperViolations && details.tamperViolations.length > 0) {
+    lines.push('')
+    lines.push('  Tamper detected:')
+    for (const v of details.tamperViolations) {
+      lines.push(`    ${v.file} — ${v.kind}: ${v.detail}${v.blocking ? '' : ' (report only)'}`)
     }
   }
 
