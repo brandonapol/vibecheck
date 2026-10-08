@@ -109,6 +109,24 @@ describe('runCheck', () => {
     expect(result.pass).toBe(true)
   })
 
+  it('fails the check on a blocking tamper finding and not on a report-only one', async () => {
+    const blocking = await runCheck(makeConfig(), {
+      mutationScore: 100,
+      semanticViolations: [],
+      tamperViolations: [{ file: '.husky/pre-commit', kind: 'hook-drift', detail: 'pre-commit hook deleted', blocking: true }],
+    })
+    expect(blocking.pass).toBe(false)
+    expect(blocking.report).toContain('hook-drift')
+
+    const noted = await runCheck(makeConfig(), {
+      mutationScore: 100,
+      semanticViolations: [],
+      tamperViolations: [{ file: '.github/workflows/vibecheck.yml', kind: 'workflow-drift', detail: 'changed', blocking: false }],
+    })
+    expect(noted.pass).toBe(true)
+    expect(noted.report).toContain('report only')
+  })
+
   it('includes formatted report in output', async () => {
     const config = makeConfig()
     const result = await runCheck(config, {
