@@ -67,7 +67,21 @@ chmod +x .git/hooks/pre-commit
 npx vibecheck init
 ```
 
-This installs the hook automatically.
+This installs the hook automatically. It also installs a `commit-msg` hook next to it.
+
+## Commit message tags
+
+Set `hooks.commitMsg` to `true` to append a phase tag while the message is being recorded:
+
+- `[vibecheck:phase1]` when the commit stages test files and no implementation
+- `[vibecheck:phase2]` when it stages implementation and no test files
+
+A commit that mixes the two, or that changes only docs or config, is left alone. The tag is not added twice. With `hooks.commitMsg` left at its default `false`, the installed hook exits without editing the message.
+
+```bash
+cp node_modules/vibecheck-tdd/hooks/commit-msg .git/hooks/commit-msg
+chmod +x .git/hooks/commit-msg
+```
 
 ## What's Allowed
 

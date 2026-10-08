@@ -139,6 +139,14 @@ const protectedTestsSchema = z
 
 const reporterSchema = z.enum(['console', 'github', 'gitlab'])
 
+const hooksSchema = z
+  .object({
+    preCommit: z.boolean().default(true),
+    /** When true, the commit-msg hook tags the message `[vibecheck:phase1]` or `[vibecheck:phase2]`. */
+    commitMsg: z.boolean().default(false),
+  })
+  .default({})
+
 export const configSchema = z.object({
   testPatterns: z
     .array(z.string())
@@ -173,6 +181,8 @@ export const configSchema = z.object({
   hiddenTests: hiddenTestsSchema,
 
   reporters: z.array(reporterSchema).default(['console']),
+
+  hooks: hooksSchema,
 })
 
 export type Config = z.infer<typeof configSchema>

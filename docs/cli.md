@@ -44,6 +44,16 @@ Exit 2 when the path is a test that already exists on the protected branch. Exit
 npx vibecheck protected --file src/core/validator.test.ts
 ```
 
+### `vibecheck commit-msg`
+
+Append `[vibecheck:phase1]` or `[vibecheck:phase2]` to the commit message file. Used by the commit-msg hook. Does nothing unless `hooks.commitMsg` is `true`.
+
+```bash
+npx vibecheck commit-msg --file .git/COMMIT_EDITMSG
+```
+
+Exit 1 when `--file` is missing. Otherwise exit 0, including when the message is left unchanged.
+
 ### `vibecheck check`
 
 Run all enabled analyzers and report the composite integrity score.
