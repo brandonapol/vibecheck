@@ -46,6 +46,7 @@ npx vibecheck check --semantic  # Run semantic diff only
 npx vibecheck check --threshold 90  # Override the composite score threshold
 npx vibecheck score             # Output composite score (0-100)
 npx vibecheck report            # Generate full integrity report
+npx vibecheck audit             # Scan history for agent edits to existing tests
 ```
 
 ## Configuration
