@@ -88,6 +88,20 @@ describe('detectGoldenUpdates', () => {
     expect(violations[0].detail).toContain('counter_v2.png')
   })
 
+  it('reports a golden that stayed pinned while the test body changed', () => {
+    const violations = detectGoldenUpdates({
+      file: 'test/widget_test.dart',
+      before: [side()],
+      after: [side({
+        bodyKey: 'pump-and-settle',
+        assertionKeys: ['expect(find.byType(Counter)|matchesGoldenFile(goldens/counter.png)|expect(find.text("1"))'],
+      })],
+      changedFiles: ['test/widget_test.dart', 'test/goldens/counter.png'],
+    })
+    expect(violations.map(v => v.pattern)).toEqual(['golden-updated'])
+    expect(violations[0].detail).toContain('test/goldens/counter.png')
+  })
+
   it('does not report a golden whose pixels did not change', () => {
     const violations = detectGoldenUpdates({
       file: 'test/widget_test.dart',
