@@ -203,11 +203,23 @@ export async function resolveStrykerBin(cwd: string): Promise<string> {
   }
 }
 
+/** Stryker starts from "mutate nothing" and only includes positive patterns.
+ *  An empty include therefore mutates nothing, which is what the config says. */
+export function strykerMutateArg(include: string[], exclude: string[]): string {
+  const positive = include.map(pattern => pattern.trim()).filter(Boolean)
+  const negative = exclude
+    .map(pattern => pattern.trim())
+    .filter(Boolean)
+    .map(pattern => (pattern.startsWith('!') ? pattern : `!${pattern}`))
+  const parts = [...positive, ...negative]
+  return parts.length > 0 ? parts.join(',') : '!**/*'
+}
+
 export async function runMutationAnalysis(config: MutationConfig, cwd = process.cwd()): Promise<CountedMutationReport> {
   const bin = await resolveStrykerBin(cwd)
   // `--jsonReporter.fileName` is not a Stryker 10 option. Passing it makes
   // current releases exit before any mutant runs.
-  await execa(bin, ['run', '--reporters', 'json'], { cwd })
+  await execa(bin, ['run', '--reporters', 'json', '--mutate', strykerMutateArg(config.include, config.exclude)], { cwd })
 
   const raw = await readFile(join(cwd, strykerReportPath(cwd)), 'utf-8')
   const report: StrykerReport = JSON.parse(raw)

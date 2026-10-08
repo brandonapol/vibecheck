@@ -2,6 +2,8 @@
 
 vibecheck is designed to run in CI as the enforcement backstop. Pre-commit hooks are local safeguards that can be bypassed; CI cannot. What has to be true of the repository for that backstop to hold is in [Threat model](threat-model.md).
 
+This repository runs that backstop on itself. The Dogfood job builds this checkout and runs `node dist/bin/vibecheck.js check --semantic` against the base ref. Mutation stays out of that job. A ShiftLeft job scans the same commits with `ShiftLeftSecurity/scan-action` (`nodejs`, `go`, `credscan`, `depscan`). That action passes `--no-error`, so findings are reported and do not fail the job.
+
 ## GitHub Actions
 
 ### Using the Template

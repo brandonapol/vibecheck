@@ -294,7 +294,8 @@ export type TestExtraction = {
   setup: SetupStatement[]
 }
 
-/** A new file is not a weakening. A file missing on the audited side still is. */
+/** A new file is not a modification. A file missing on the audited side still is.
+ *  New files are scored separately, by `detectAddedTestFile`. */
 export function semanticDiffSides(before: string, after: string): { before: string; after: string } | null {
   if (!before) return null
   return { before, after }
@@ -311,6 +312,27 @@ export function detectWeakeningInDiff(
     { tests: extractTests(after), setup: extractSetup(after) },
     file,
     typescriptAssertionStrength,
+  )
+}
+
+/** Score a test file that does not exist on the base ref.
+ *  Only the added-test patterns apply. The empty before side is not parsed,
+ *  because Go and Dart reject an empty file. */
+export async function detectAddedTestFile(
+  after: string,
+  file: string,
+  adapter: LanguageAdapter,
+): Promise<WeakeningViolation[]> {
+  if (after.trim() === '') return []
+  const [tests, setup] = await Promise.all([
+    adapter.extractTests(after, file),
+    adapter.extractSetup(after, file),
+  ])
+  return compareExtractions(
+    { tests: [], setup: [] },
+    { tests, setup },
+    file,
+    matcher => adapter.assertionStrength(matcher),
   )
 }
 

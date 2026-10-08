@@ -52,6 +52,25 @@ export function detectConfigWeakening(
     }
   }
 
+  const droppedTestPatterns = removed(before.testPatterns, after.testPatterns)
+  if (droppedTestPatterns.length > 0) {
+    violations.push({
+      field: 'testPatterns',
+      before: before.testPatterns,
+      after: after.testPatterns,
+      detail: `Test patterns removed: ${droppedTestPatterns.join(', ')}`,
+    })
+  }
+
+  if (before.hooks.preCommit && !after.hooks.preCommit) {
+    violations.push({
+      field: 'hooks.preCommit',
+      before: true,
+      after: false,
+      detail: 'Pre-commit hook was disabled',
+    })
+  }
+
   const droppedEnvVars = removed(before.agentEnvVars, after.agentEnvVars)
   if (droppedEnvVars.length > 0) {
     violations.push({

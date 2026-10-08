@@ -12,5 +12,9 @@ export const typescriptAdapter: LanguageAdapter = {
   extractTests: async source => extractTests(source),
   extractSetup: async source => extractSetup(source),
   assertionStrength: typescriptAssertionStrength,
-  runMutation: options => runMutationAnalysis(options.mutation),
+  runMutation: options => runMutationAnalysis({
+    ...options.mutation,
+    include: options.include,
+    exclude: options.exclude,
+  }),
 }
