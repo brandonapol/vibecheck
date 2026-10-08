@@ -72,7 +72,7 @@ Each surviving mutant tells you exactly where your tests are weak: line number, 
 
 ## Limitations
 
-Mutation testing is computationally expensive. A large codebase can take minutes to test. Use the `include` and `exclude` patterns to scope it to critical code paths.
+Mutation testing is computationally expensive. A large codebase can take minutes to test. Use the `include` and `exclude` patterns to scope it to critical code paths. A TypeScript run passes them to Stryker as `--mutate` (`include` entries, then `!exclude` entries). An empty `include` mutates nothing. A `languages.typescript.mutation` include or exclude replaces the top-level list for that run. Go already applied its own globs.
 
 An agent can still game mutation testing by writing tests that are technically precise but only cover happy paths. That's why vibecheck combines it with other analyzers.
 
