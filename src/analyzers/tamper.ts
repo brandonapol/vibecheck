@@ -26,7 +26,7 @@ export function isHookPath(file: string): boolean {
 }
 
 export function isWorkflowPath(file: string): boolean {
-  return norm(file) === '.github/workflows/vibecheck.yml'
+  return /^\.github\/workflows\/[^/]+\.ya?ml$/.test(norm(file))
 }
 
 export function isRunnerConfig(file: string): boolean {

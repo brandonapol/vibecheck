@@ -2,6 +2,7 @@ import { execa } from 'execa'
 import type { Config } from '../config/schema.js'
 import { detectAgentTrailers } from '../core/detector.js'
 import { matchesPatterns } from '../core/resolver.js'
+import { patternsForConfig } from '../core/test-patterns.js'
 
 export type AuditFile = {
   status: string
@@ -29,6 +30,7 @@ const STATUS_LINE = /^([AMDTRC])\d*$/
  */
 export function findAuditHits(commits: AuditCommit[], config: Config): AuditHit[] {
   const hits: AuditHit[] = []
+  const patterns = patternsForConfig(config)
   for (const entry of commits) {
     const trailer = detectAgentTrailers(entry.message, config.agentTrailers)
     if (!trailer.isAgent || !trailer.matchedTrailer) continue
@@ -37,12 +39,12 @@ export function findAuditHits(commits: AuditCommit[], config: Config): AuditHit[
       const kind = file.status[0]
       if (kind === 'A') continue
       if (kind === 'R' || kind === 'C') {
-        if (file.previousPath && matchesPatterns(file.previousPath, config.testPatterns)) {
+        if (file.previousPath && matchesPatterns(file.previousPath, patterns)) {
           files.push(file.previousPath)
         }
         continue
       }
-      if (matchesPatterns(file.path, config.testPatterns)) files.push(file.path)
+      if (matchesPatterns(file.path, patterns)) files.push(file.path)
     }
     if (files.length > 0) {
       hits.push({ sha: entry.sha, signal: `trailer:${trailer.matchedTrailer}`, files })

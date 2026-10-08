@@ -175,6 +175,16 @@ export function detectConfigWeakening(
     })
   }
 
+  const droppedPatterns = removed(before.semanticDiff.patterns, after.semanticDiff.patterns)
+  if (droppedPatterns.length > 0) {
+    violations.push({
+      field: 'semanticDiff.patterns',
+      before: before.semanticDiff.patterns,
+      after: after.semanticDiff.patterns,
+      detail: `Semantic diff patterns removed: ${droppedPatterns.join(', ')}`,
+    })
+  }
+
   detectLanguageWeakening(resolveLanguages(before), resolveLanguages(after), violations)
   detectHiddenWeakening(before, after, violations)
 

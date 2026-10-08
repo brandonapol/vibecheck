@@ -9,5 +9,17 @@ export default defineConfig({
   test: {
     root,
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      all: true,
+      reporter: ['text'],
+      include: ['src/**/*.ts'],
+      thresholds: {
+        lines: 95,
+        statements: 95,
+        functions: 93,
+        branches: 88,
+      },
+    },
   },
 })

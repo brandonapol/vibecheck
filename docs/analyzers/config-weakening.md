@@ -25,6 +25,7 @@ This effectively disarms vibecheck without modifying any test code. The config w
 | Exclude list expansion | Adding entries to `mutation.exclude` |
 | Include list shrinkage | Removing entries from `mutation.include` |
 | Test pattern shrinkage | Removing entries from `testPatterns` |
+| Semantic pattern shrinkage | Removing entries from `semanticDiff.patterns` |
 | Pre-commit hook disabled | `hooks.preCommit: true` to `false` |
 | Hidden tests weakened | Disabling them, lowering `hiddenTests.threshold`, `block` to `warn`, or changing `source` / `path` / `url` / `branch` |
 

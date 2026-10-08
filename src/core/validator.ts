@@ -1,5 +1,6 @@
 import type { Config } from '../config/schema.js'
 import { detectAgent, detectAgentTrailers, type AgentIdentity } from './detector.js'
+import { patternsForConfig } from './test-patterns.js'
 
 export type Violation = {
   file: string
@@ -41,7 +42,7 @@ export async function validate(config: Config, options: ValidateOptions): Promis
   if (enforcementLevel === 'off') return { ok: true }
 
   const staged = await options.getStagedFiles()
-  const protectedFiles = await options.getProtectedPaths(staged, config.testPatterns, config.protectedBranch)
+  const protectedFiles = await options.getProtectedPaths(staged, patternsForConfig(config), config.protectedBranch)
 
   if (protectedFiles.length === 0) return { ok: true }
 

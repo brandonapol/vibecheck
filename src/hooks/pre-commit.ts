@@ -1,9 +1,12 @@
 import type { Config } from '../config/schema.js'
 import { detectAgent, type AgentIdentity } from '../core/detector.js'
 import { getProtectedPaths, getStagedFiles, matchesPatterns } from '../core/resolver.js'
+import { isSupplementalTest } from '../core/supplemental-tests.js'
+import { patternsForConfig } from '../core/test-patterns.js'
 import { validate } from '../core/validator.js'
 
 const CODE_FILE = /\.(ts|tsx|js|jsx)$/
+const OTHER_IMPL = /\.(go|dart)$/
 const CONFIG_FILE = /(^|\/)(vibecheck\.config\.(ts|js|mjs|cjs)|\.vibecheck\.config\.[^/]+)$/
 const NOT_IMPL = new Set(['tsup.config.ts', 'vitest.config.ts'])
 
@@ -24,12 +27,12 @@ export function classifyStaged(files: string[], testPatterns: string[]): StagedK
       config.push(file)
       continue
     }
-    if (matchesPatterns(file, testPatterns)) {
+    if (matchesPatterns(file, testPatterns) || isSupplementalTest(file)) {
       tests.push(file)
       continue
     }
     const base = file.split('/').pop() ?? file
-    if (CODE_FILE.test(file) && !NOT_IMPL.has(base)) impl.push(file)
+    if ((CODE_FILE.test(file) && !NOT_IMPL.has(base)) || OTHER_IMPL.test(file)) impl.push(file)
   }
   return { tests, impl, config }
 }
@@ -70,7 +73,7 @@ export async function runPreCommit(config: Config, input: HookInput): Promise<Ho
   const level = identity === 'agent' ? config.enforcement.agents : config.enforcement.unknown
   if (level === 'off') return { exitCode: 0, message: '' }
 
-  const { tests, impl, config: configFiles } = classifyStaged(input.staged, config.testPatterns)
+  const { tests, impl, config: configFiles } = classifyStaged(input.staged, patternsForConfig(config))
   const sections: string[] = []
 
   if (tests.length > 0 && impl.length > 0) {
@@ -141,7 +144,7 @@ export async function runPreCommit(config: Config, input: HookInput): Promise<Ho
 
 /** What `vibecheck check --hook` runs against the real git index. */
 export async function runInstalledHook(config: Config, env: Record<string, string | undefined> = process.env): Promise<HookResult> {
-  const staged = await getStagedFiles()
-  const protectedPaths = await getProtectedPaths(staged, config.testPatterns, config.protectedBranch)
+  const staged = await getStagedFiles({ noRenames: true })
+  const protectedPaths = await getProtectedPaths(staged, patternsForConfig(config), config.protectedBranch)
   return runPreCommit(config, { staged, commitMessage: '', env, protectedPaths })
 }

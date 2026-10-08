@@ -83,7 +83,7 @@ Exit code 0 when every gate passes, 1 otherwise. See [Pass/Fail](scoring.md#pass
 |------|-------------|
 | `--mutation` | Run only mutation testing |
 | `--semantic` | Run only semantic diff analysis |
-| `--threshold <n>` | Override the composite score threshold (0-100). The mutation thresholds are not affected. |
+| `--threshold <n>` | Override the composite score threshold. Must be a finite number from 0 to 100; anything else exits 1 before the check runs. The mutation thresholds are not affected. |
 | `--base <ref>` | Read the config from `<ref>` and fail if the working-tree config weakens it. Implied in CI, with `origin/<protectedBranch>` as the ref. |
 | `--hook` | Pre-commit mode. Classifies staged files, blocks edits to tests that already exist on the protected branch, and exits from the enforcement level (`block` rejects, `warn` prints and allows, `off` skips). Does not run mutation or semantic diff. |
 | `--since <ref>` | For `audit` only. Scan `<ref>..HEAD` instead of every commit reachable from `HEAD`. |

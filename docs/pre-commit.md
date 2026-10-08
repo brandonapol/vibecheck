@@ -43,12 +43,16 @@ Config changes alongside test files are allowed.
 
 | Pattern | Classification |
 |---------|---------------|
-| `*.test.ts`, `*.test.tsx`, `*.test.js`, `*.test.jsx` | Test file |
-| `*.spec.ts`, `*.spec.tsx`, `*.spec.js`, `*.spec.jsx` | Test file |
-| `__tests__/*` | Test file |
+| `*.test` / `*.spec` ending in `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` | Test file |
+| `__tests__/*` with those extensions | Test file |
+| `*_test.go`, `*_test.dart` | Test file |
+| A path matching an enabled language's `testPatterns` | Test file |
 | `vibecheck.config.*`, `.vibecheck.config.*` | Config file |
 | `*.ts`, `*.tsx`, `*.js`, `*.jsx` (not matching above) | Implementation file |
+| `*.go`, `*.dart` (not a test) | Implementation file |
 | Everything else (`.md`, `.json`, `.yml`, etc.) | Ignored — always allowed |
+
+The staged list uses `git diff --cached --name-only --no-renames`, so renaming a protected test still shows the old path. `status`, `protected`, `audit`, and this hook use the enabled languages' test patterns. With no `languages` entry, that is the top-level list.
 
 ## Installation
 

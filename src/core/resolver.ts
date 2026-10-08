@@ -5,10 +5,14 @@ export function matchesPatterns(file: string, patterns: string[]): boolean {
   return micromatch.isMatch(file, patterns)
 }
 
-export async function getStagedFiles(): Promise<string[]> {
-  const result = await execa('git', ['diff', '--cached', '--name-only'])
+export async function getStagedFiles(options?: { noRenames?: boolean }): Promise<string[]> {
+  const args = ['diff', '--cached', '--name-only']
+  // Without this, a rename of a protected test is only the new path, which
+  // is not on the protected branch yet.
+  if (options?.noRenames) args.push('--no-renames')
+  const result = await execa('git', args)
   if (!result.stdout) return []
-  return result.stdout.split('\n')
+  return result.stdout.split('\n').filter(Boolean)
 }
 
 function gitText(err: unknown): string {

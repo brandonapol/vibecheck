@@ -2,7 +2,7 @@
 
 vibecheck is designed to run in CI as the enforcement backstop. Pre-commit hooks are local safeguards that can be bypassed; CI cannot. What has to be true of the repository for that backstop to hold is in [Threat model](threat-model.md).
 
-This repository runs that backstop on itself. The Dogfood job builds this checkout and runs `node dist/bin/vibecheck.js check --semantic` against the base ref. Mutation stays out of that job. A ShiftLeft job scans the same commits with `ShiftLeftSecurity/scan-action` (`nodejs`, `go`, `credscan`, `depscan`). That action passes `--no-error`, so findings are reported and do not fail the job.
+This repository runs that backstop on itself. The Dogfood job builds this checkout and runs `node dist/bin/vibecheck.js check --semantic` against the base ref. Mutation stays out of that job. The same job then compiles `helpers/go-testast` when `go` is already on the runner, and runs `npx vitest run --coverage`. That compile fills the Go build cache; a cold build of the parser is slower than the test timeout. `vitest.config.ts` sets line, statement, function, and branch floors for `src/**/*.ts` with `all: true`, so an untested source file fails the job. On GitHub Actions, each check failure is also printed as a `::error::` annotation. A ShiftLeft job scans the same commits with `ShiftLeftSecurity/scan-action` (`nodejs`, `go`, `credscan`, `depscan`). That action passes `--no-error`, so findings are reported and do not fail the job. An edit to any `.github/workflows/*.yml` file is reported as workflow drift and does not, by itself, fail the check.
 
 ## GitHub Actions
 

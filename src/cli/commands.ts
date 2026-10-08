@@ -40,3 +40,11 @@ export function parseArgs(args: string[]): CliCommand {
 
   return { command: command as CliCommand['command'], flags }
 }
+
+/** `score < NaN` is false, so a bad flag would skip the score gate. */
+export function assertThreshold(value: number | undefined): void {
+  if (value === undefined) return
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    throw new Error('vibecheck: --threshold must be a number from 0 to 100')
+  }
+}

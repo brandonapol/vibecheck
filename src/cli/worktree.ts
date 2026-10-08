@@ -14,9 +14,18 @@ export function auditTarget(env: Record<string, string | undefined>): 'HEAD' | '
 
 /** Files changed between `baseRef` and the worktree, or `toRef` when given.
  *  A git failure is an error: an empty list would make every protected test look untouched. */
-export async function getChangedFiles(baseRef: string, toRef?: string): Promise<string[]> {
+export async function getChangedFiles(
+  baseRef: string,
+  toRef?: string,
+  options?: { noRenames?: boolean },
+): Promise<string[]> {
   try {
-    const args = toRef ? ['diff', '--name-only', baseRef, toRef] : ['diff', '--name-only', baseRef]
+    // Rename detection keeps only the new path, so a renamed test never
+    // shows up as a deletion. Callers that score deletions pass noRenames.
+    const args = ['diff', '--name-only']
+    if (options?.noRenames) args.push('--no-renames')
+    args.push(baseRef)
+    if (toRef) args.push(toRef)
     const { stdout } = await execa('git', args)
     return stdout.split('\n').filter(Boolean)
   } catch (err) {

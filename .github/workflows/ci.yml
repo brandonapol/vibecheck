@@ -67,6 +67,16 @@ jobs:
       - run: npm run build
       - name: Run vibecheck
         run: node dist/bin/vibecheck.js check --semantic --base origin/${{ github.base_ref || 'main' }}
+      # A cold go build compiles the standard library and takes longer than
+      # the test timeout. Compile the helper once so coverage reuses the cache.
+      - name: Warm the Go parser cache
+        working-directory: helpers/go-testast
+        run: |
+          if command -v go >/dev/null 2>&1; then
+            go build -o /tmp/vibecheck-go-testast .
+          fi
+      - name: Coverage
+        run: npx vitest run --coverage
 
   # Open-source ShiftLeft scan. The action passes --no-error, so findings
   # are reported and do not fail this job. It stays off the Dogfood job
