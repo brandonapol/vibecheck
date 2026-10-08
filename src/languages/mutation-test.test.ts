@@ -197,6 +197,7 @@ describe('runMutationTest', () => {
     expect(input).not.toContain('add_test.dart')
     expect(input).not.toContain('lib/skip.dart')
     expect(input).toContain('failure="0"')
+    expect(input).toContain('timeout="180"')
     expect(input).toContain('dart test')
   })
 
@@ -227,6 +228,22 @@ describe('runMutationTest', () => {
     }
     expect(message).toContain('not a mutation score')
     expect(message).toContain('build failed')
+  })
+
+  it('includes stdout when a failed run writes no report', async () => {
+    mockExeca.mockResolvedValue({
+      exitCode: 1,
+      stderr: '',
+      stdout: 'Error while processing: unmodified code',
+    } as never)
+    let message = ''
+    try {
+      await runMutationTest(options(), cwd, env())
+    } catch (error) {
+      message = (error as Error).message
+    }
+    expect(message).toContain('not a mutation score')
+    expect(message).toContain('unmodified code')
   })
 
   it('in CI mutates only changed Dart sources and marks the report diff-scoped', async () => {

@@ -1,3 +1,4 @@
+import { execa } from 'execa'
 import { describe, it, expect } from 'vitest'
 import { constants } from 'node:fs'
 import { accessSync } from 'node:fs'
@@ -37,6 +38,9 @@ describe.skipIf(!hasDart)(hasDart ? 'mutation_test integration' : 'mutation_test
     const env = { ...process.env }
     delete env.CI
     delete env.GITHUB_BASE_REF
+    // The first dart test also resolves packages. Do that before mutation_test
+    // starts its own timed command.
+    await execa('dart', ['pub', 'get'], { cwd: fixture })
     const report = await runMutationTest(
       {
         include: ['lib/**/*.dart'],
@@ -63,5 +67,5 @@ describe.skipIf(!hasDart)(hasDart ? 'mutation_test integration' : 'mutation_test
         ),
       ).toBe(true)
     }
-  }, 180_000)
+  }, 300_000)
 })
