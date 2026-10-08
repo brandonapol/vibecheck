@@ -113,6 +113,17 @@ jobs:
       - run: npx vibecheck check --threshold ${{ inputs.threshold }} --base origin/${{ github.base_ref || 'main' }}
 ```
 
+### GitLab CI
+
+`vibecheck init` copies `templates/gitlab-ci.yml` to `.gitlab/vibecheck.yml` when `.gitlab-ci.yml` is already there. Include it:
+
+```yaml
+include:
+  - local: .gitlab/vibecheck.yml
+```
+
+See [docs/ci.md](docs/ci.md) for the remote include and the hidden-tests file variable.
+
 ## Example Output
 
 ```

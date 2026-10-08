@@ -72,6 +72,11 @@ async function main() {
       console.log('Added .github/workflows/vibecheck.yml')
     }
 
+    if (result.gitlabCiCreated) {
+      console.log('Added .gitlab/vibecheck.yml')
+      console.log('Include it from .gitlab-ci.yml:\n\ninclude:\n  - local: .gitlab/vibecheck.yml')
+    }
+
     if (result.hook.action === 'created') {
       console.log(`Installed ${result.hook.path}`)
     } else if (result.hook.action === 'appended') {
