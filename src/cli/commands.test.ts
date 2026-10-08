@@ -63,4 +63,11 @@ describe('parseArgs', () => {
   it('parses check --hook', () => {
     expect(parseArgs(['check', '--hook'])).toEqual({ command: 'check', flags: { hook: true } })
   })
+
+  it('parses protected --file', () => {
+    expect(parseArgs(['protected', '--file', 'src/a.test.ts'])).toEqual({
+      command: 'protected',
+      flags: { file: 'src/a.test.ts' },
+    })
+  })
 })

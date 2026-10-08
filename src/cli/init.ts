@@ -7,13 +7,35 @@ export type HookInstall = {
   action: 'created' | 'appended' | 'unchanged' | 'skipped'
 }
 
+export type ClaudeHookInstall = {
+  action: 'installed' | 'snippet' | 'unchanged' | 'skipped'
+}
+
 export type InitResult = {
   configCreated: boolean
   hiddenDirCreated: boolean
   ciCreated: boolean
   claudeSnippet: string
   hook: HookInstall
+  claudeHook: ClaudeHookInstall
 }
+
+const INLINE_CLAUDE_SETTINGS = `{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .claude/hooks/vibecheck-protected.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+`
 
 const HOOK_LINE = 'npx --no-install vibecheck check --hook'
 
@@ -47,6 +69,7 @@ export async function scaffoldProject(cwd: string): Promise<InitResult> {
     ciCreated: false,
     claudeSnippet: '',
     hook: { path: '.git/hooks/pre-commit', action: 'skipped' },
+    claudeHook: { action: 'skipped' },
   }
 
   const configPath = join(cwd, 'vibecheck.config.ts')
@@ -81,8 +104,37 @@ export async function scaffoldProject(cwd: string): Promise<InitResult> {
     ? readFileSync(claudePath, 'utf-8')
     : getInlineClaudeSnippet()
   result.hook = installHook(cwd)
+  result.claudeHook = installClaudeHook(cwd)
 
   return result
+}
+
+/** When `.claude/` exists, install the PreToolUse hook. Never rewrite a settings file that is already there. */
+export function installClaudeHook(cwd: string): ClaudeHookInstall {
+  const claude = join(cwd, '.claude')
+  if (!existsSync(claude)) return { action: 'skipped' }
+
+  const hooksDir = join(claude, 'hooks')
+  mkdirSync(hooksDir, { recursive: true })
+  const script = join(hooksDir, 'vibecheck-protected.sh')
+  const templatesDir = getTemplatesDir()
+  if (!existsSync(script)) {
+    const template = join(templatesDir, 'claude-protected.sh')
+    if (existsSync(template)) copyFileSync(template, script)
+    else writeFileSync(script, '#!/bin/sh\nexit 0\n')
+    chmodSync(script, 0o755)
+  }
+
+  const settings = join(claude, 'settings.json')
+  if (!existsSync(settings)) {
+    const template = join(templatesDir, 'claude-settings.json')
+    if (existsSync(template)) copyFileSync(template, settings)
+    else writeFileSync(settings, INLINE_CLAUDE_SETTINGS)
+    return { action: 'installed' }
+  }
+  const text = readFileSync(settings, 'utf-8')
+  if (text.includes('vibecheck-protected.sh')) return { action: 'unchanged' }
+  return { action: 'snippet' }
 }
 
 function packageHasHusky(cwd: string): boolean {

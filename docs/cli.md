@@ -16,6 +16,7 @@ Creates:
 - `.vibecheck-hidden/` directory for hidden tests
 - `.github/workflows/vibecheck.yml` (if `.github/workflows/` exists)
 - A pre-commit hook: appended to `.husky/pre-commit` when Husky is present, otherwise `.git/hooks/pre-commit`. An existing hook is kept; the vibecheck line is added. Skipped when the directory is not a git checkout.
+- When `.claude/` already exists, `.claude/hooks/vibecheck-protected.sh`. `settings.json` is created only if it is missing. An existing settings file is never rewritten; init prints where the snippet lives instead.
 - Prints a CLAUDE.md snippet to stdout
 
 ### `vibecheck status`
@@ -32,6 +33,14 @@ vibecheck: test protection
 src/core/
   protected  validator.test.ts
   new        extra.test.ts
+```
+
+### `vibecheck protected`
+
+Exit 2 when the path is a test that already exists on the protected branch. Exit 0 otherwise (not a test, or a test that is new). Claude Code's PreToolUse hook treats exit 2 as a block. See [Claude Code Hook](claude-hook.md).
+
+```bash
+npx vibecheck protected --file src/core/validator.test.ts
 ```
 
 ### `vibecheck check`
@@ -85,8 +94,9 @@ npx vibecheck help
 
 | Code | Meaning |
 |------|---------|
-| `0` | All checks passed |
+| `0` | All checks passed, or `protected` found the path is not a protected test |
 | `1` | A gate failed: composite score, mutation score, or blocking semantic violations |
+| `2` | `protected` refused the path: it is a test on the protected branch, or `--file` was omitted |
 
 ## Environment Variables
 

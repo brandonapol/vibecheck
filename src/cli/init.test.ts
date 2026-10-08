@@ -109,4 +109,36 @@ describe('scaffoldProject', () => {
     expect(existsSync(join(tmpDir, '.git', 'hooks', 'pre-commit'))).toBe(false)
     expect(readFileSync(join(tmpDir, '.husky', 'pre-commit'), 'utf-8')).toContain('npx lint-staged')
   })
+
+  it('skips the Claude hook when .claude/ is absent', async () => {
+    const result = await scaffoldProject(tmpDir)
+    expect(result.claudeHook).toEqual({ action: 'skipped' })
+  })
+
+  it('installs the Claude PreToolUse hook when .claude/ exists and settings do not', async () => {
+    mkdirSync(join(tmpDir, '.claude'))
+    const result = await scaffoldProject(tmpDir)
+    const script = join(tmpDir, '.claude', 'hooks', 'vibecheck-protected.sh')
+    expect(result.claudeHook).toEqual({ action: 'installed' })
+    expect(readFileSync(script, 'utf-8')).toContain('vibecheck protected --file')
+    expect(statSync(script).mode & 0o111).not.toBe(0)
+    const settings = readFileSync(join(tmpDir, '.claude', 'settings.json'), 'utf-8')
+    expect(settings).toContain('PreToolUse')
+    expect(settings).toContain('vibecheck-protected.sh')
+  })
+
+  it('does not rewrite Claude settings that already exist', async () => {
+    mkdirSync(join(tmpDir, '.claude'))
+    const settingsPath = join(tmpDir, '.claude', 'settings.json')
+    writeFileSync(settingsPath, '{"hooks":{}}\n')
+    const snippet = await scaffoldProject(tmpDir)
+    expect(snippet.claudeHook).toEqual({ action: 'snippet' })
+    expect(readFileSync(settingsPath, 'utf-8')).toBe('{"hooks":{}}\n')
+
+    writeFileSync(settingsPath, '{"command":"sh .claude/hooks/vibecheck-protected.sh"}\n')
+    const again = await scaffoldProject(tmpDir)
+    expect(again.claudeHook).toEqual({ action: 'unchanged' })
+    expect(readFileSync(settingsPath, 'utf-8')).toContain('vibecheck-protected.sh')
+  })
 })
+
