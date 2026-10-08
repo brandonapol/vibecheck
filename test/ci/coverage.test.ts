@@ -22,6 +22,13 @@ describe('dogfood coverage', () => {
     expect(job.includes('node-version: [18, 20, 22]')).toBe(false)
   })
 
+  it('warms the Go parser cache before coverage', () => {
+    const job = jobContaining(workflow, COVERAGE)
+    expect(job.includes('working-directory: helpers/go-testast')).toBe(true)
+    expect(job.includes('go build -o /tmp/vibecheck-go-testast .')).toBe(true)
+    expect(job.includes('setup-go')).toBe(false)
+  })
+
   it('fails the run when src coverage drops under the floor', () => {
     expect(config.includes('all: true')).toBe(true)
     expect(config.includes("include: ['src/**/*.ts']")).toBe(true)
