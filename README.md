@@ -154,21 +154,22 @@ vibecheck detects assertion weakening by comparing test files before and after c
 
 Assertion strength rankings: `toBe` (10), `toEqual` (9), `toStrictEqual` (10), `toHaveLength` (8), `toMatchObject` (7), `toContain` (6), `toThrowError` (7), `toThrow` (4), `toBeTruthy` (3), `toBeFalsy` (3), `toBeDefined` (2).
 
-## v0.1.0 (Current)
+## v0.3.0 (Current)
 
-- Mutation testing via Stryker
-- Semantic diff assertion weakening detection
-- Composite integrity score with weighted components
-- Console reporter
-- `vibecheck init` / `check` / `score` / `report` CLI
-- GitHub Actions workflow template
-- CLAUDE.md template for AI agents
+- Agent identity from commit trailers and the environment. A commit with no signal is `unknown` and strict by default.
+- Semantic diff as its own gate. CI reads the config from the base branch and fails when that config is weakened.
+- Protected tests, `vibecheck status`, `vibecheck audit`, and an opt-in commit-msg phase tag.
+- Hidden tests. Go and Dart/Flutter semantic diff. Go mutation testing via gremlins.
+- GitHub Actions and GitLab CI templates. This repo runs the semantic check and a coverage floor on its own source.
+- `vibecheck.config.ts` loads under plain Node.
+
+0.2.0 was the first npm release: Stryker, semantic diff, the composite score, the CLI, and the GitHub Actions template.
 
 ## Roadmap
 
-**v0.2.0**: Hidden test suite runner, property-based test enforcement, GitHub PR comment reporter
+**v0.4.0**: Dart mutation testing, property-based test enforcement, monorepo config
 
-**v0.3.0**: VSCode extension, audit mode, dashboard, monorepo support
+**v0.5.0**: VS Code extension that marks protected test files
 
 ## License
 
