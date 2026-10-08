@@ -1,13 +1,21 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, chmodSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+export type HookInstall = {
+  path: string
+  action: 'created' | 'appended' | 'unchanged' | 'skipped'
+}
 
 export type InitResult = {
   configCreated: boolean
   hiddenDirCreated: boolean
   ciCreated: boolean
   claudeSnippet: string
+  hook: HookInstall
 }
+
+const HOOK_LINE = 'npx --no-install vibecheck check --hook'
 
 const CONFIG_TEMPLATE = `import { defineConfig } from 'vibecheck-tdd'
 
@@ -38,6 +46,7 @@ export async function scaffoldProject(cwd: string): Promise<InitResult> {
     hiddenDirCreated: false,
     ciCreated: false,
     claudeSnippet: '',
+    hook: { path: '.git/hooks/pre-commit', action: 'skipped' },
   }
 
   const configPath = join(cwd, 'vibecheck.config.ts')
@@ -68,13 +77,53 @@ export async function scaffoldProject(cwd: string): Promise<InitResult> {
 
   const templatesDir = getTemplatesDir()
   const claudePath = join(templatesDir, 'CLAUDE.md')
-  if (existsSync(claudePath)) {
-    result.claudeSnippet = readFileSync(claudePath, 'utf-8')
-  } else {
-    result.claudeSnippet = getInlineClaudeSnippet()
-  }
+  result.claudeSnippet = existsSync(claudePath)
+    ? readFileSync(claudePath, 'utf-8')
+    : getInlineClaudeSnippet()
+  result.hook = installHook(cwd)
 
   return result
+}
+
+function packageHasHusky(cwd: string): boolean {
+  const pkgPath = join(cwd, 'package.json')
+  if (!existsSync(pkgPath)) return false
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    return 'husky' in { ...pkg.dependencies, ...pkg.devDependencies }
+  } catch {
+    return false
+  }
+}
+
+function writeHook(file: string, display: string): HookInstall {
+  if (!existsSync(file)) {
+    writeFileSync(file, `#!/bin/sh\n${HOOK_LINE}\n`)
+    chmodSync(file, 0o755)
+    return { path: display, action: 'created' }
+  }
+  const text = readFileSync(file, 'utf-8')
+  if (text.includes('vibecheck check --hook')) return { path: display, action: 'unchanged' }
+  writeFileSync(file, text.endsWith('\n') ? `${text}${HOOK_LINE}\n` : `${text}\n${HOOK_LINE}\n`)
+  return { path: display, action: 'appended' }
+}
+
+/** Husky when the project uses it; otherwise `.git/hooks`. Never replaces an existing hook. */
+export function installHook(cwd: string): HookInstall {
+  if (existsSync(join(cwd, '.husky')) || packageHasHusky(cwd)) {
+    const dir = join(cwd, '.husky')
+    mkdirSync(dir, { recursive: true })
+    return writeHook(join(dir, 'pre-commit'), '.husky/pre-commit')
+  }
+  if (!existsSync(join(cwd, '.git'))) {
+    return { path: '.git/hooks/pre-commit', action: 'skipped' }
+  }
+  const dir = join(cwd, '.git', 'hooks')
+  mkdirSync(dir, { recursive: true })
+  return writeHook(join(dir, 'pre-commit'), '.git/hooks/pre-commit')
 }
 
 function getInlineWorkflowTemplate(): string {
