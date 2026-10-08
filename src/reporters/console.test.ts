@@ -29,6 +29,18 @@ describe('formatReport', () => {
     expect(output).toContain('80')
   })
 
+  it('marks a diff-scoped mutation run', () => {
+    const score: IntegrityScore = {
+      total: 80,
+      components: { mutation: 80 },
+    }
+    const output = formatReport(score, 80, {
+      mutation: { overallScore: 80, fileScores: {}, survivingMutants: [], diffScoped: true },
+      mutationThreshold: 80,
+    })
+    expect(output).toContain('Mutation Score:       80% (threshold: 80, diff-scoped)')
+  })
+
   it('includes surviving mutants when provided', () => {
     const score: IntegrityScore = {
       total: 75,
