@@ -24,6 +24,8 @@ This effectively disarms vibecheck without modifying any test code. The config w
 | Enforcement downgrade | `'block'` to `'warn'` or `'comment'` |
 | Exclude list expansion | Adding entries to `mutation.exclude` |
 | Include list shrinkage | Removing entries from `mutation.include` |
+| Test pattern shrinkage | Removing entries from `testPatterns` |
+| Pre-commit hook disabled | `hooks.preCommit: true` to `false` |
 | Hidden tests weakened | Disabling them, lowering `hiddenTests.threshold`, `block` to `warn`, or changing `source` / `path` / `url` / `branch` |
 
 ## What It Allows
@@ -35,6 +37,7 @@ Strengthening changes are always allowed:
 - Upgrading enforcement from `'warn'` to `'block'`
 - Narrowing exclude lists
 - Expanding include lists
+- Turning `hooks.commitMsg` on or off. It tags a message. It is not a gate.
 
 ## Pre-commit Protection
 
