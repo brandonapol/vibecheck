@@ -5,7 +5,7 @@ import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkMutationThresholds, type MutationConfig } from '../analyzers/mutation.js'
 import { defaultConfig } from '../config/schema.js'
-import { runMutationTest } from './mutation-test.js'
+import { runMutationTest } from './dart-mutation.js'
 
 const fixture = join(dirname(fileURLToPath(import.meta.url)), '../../test/fixtures/dart')
 

@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { defaultConfig } from '../config/schema.js'
-import { parseMutationTestReport, runMutationTest } from './mutation-test.js'
+import { parseMutationTestReport, runMutationTest } from './dart-mutation.js'
 import type { MutationRunOptions } from './types.js'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
