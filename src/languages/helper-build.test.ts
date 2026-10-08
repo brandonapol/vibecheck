@@ -21,7 +21,10 @@ describe('helper builds', () => {
         started += 1
         if (started === 2) release()
         await bothStarted
-        writeFileSync(output, "#!/bin/sh\nprintf '%s\\n' '{\"tests\":[],\"setup\":[]}'\n")
+        writeFileSync(
+          output,
+          "#!/bin/sh\ncat >/dev/null\nprintf '%s\\n' '{\"tests\":[],\"setup\":[]}'\n",
+        )
         chmodSync(output, 0o755)
       },
     }
