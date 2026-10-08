@@ -65,7 +65,7 @@ jobs:
 
 | Secret | Required | Description |
 |--------|----------|-------------|
-| `hidden-tests-deploy-key` | No | SSH deploy key for private hidden tests repo |
+| `hidden-tests-deploy-key` | No | SSH private key for `hiddenTests.source: 'repo'`. The workflow writes it to `VIBECHECK_HIDDEN_TESTS_KEY` when the secret is non-empty. |
 
 ### Branch Protection
 

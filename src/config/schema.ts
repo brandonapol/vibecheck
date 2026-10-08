@@ -62,17 +62,27 @@ const propertyTestsSchema = z
   })
   .default({})
 
+const hiddenGate = {
+  /** Only a project-local Vitest binary is invoked. */
+  tool: z.enum(['vitest']).default('vitest'),
+  /** Pass rate (0–100) below this fails the check when enforcement is block. */
+  threshold: z.number().min(0).max(100).default(100),
+  enforcement: z.enum(['block', 'warn']).default('block'),
+}
+
 const hiddenTestsDirectorySchema = z.object({
   enabled: z.literal(true),
   source: z.literal('directory'),
-  path: z.string(),
+  path: z.string().min(1),
+  ...hiddenGate,
 })
 
 const hiddenTestsRepoSchema = z.object({
   enabled: z.literal(true),
   source: z.literal('repo'),
-  url: z.string(),
+  url: z.string().min(1),
   branch: z.string().default('main'),
+  ...hiddenGate,
 })
 
 const hiddenTestsDisabledSchema = z.object({

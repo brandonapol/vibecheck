@@ -53,6 +53,8 @@ export default defineConfig({
     enabled: true,
     source: 'directory',      // 'directory' | 'repo'
     path: '.vibecheck-hidden',
+    threshold: 100,
+    enforcement: 'block',     // 'block' | 'warn'
   },
 
   // Property-based testing requirements
@@ -89,7 +91,18 @@ export default defineConfig({
 
 ## Hidden Tests
 
-Hidden tests can be sourced from a local directory or a private git repository:
+Holdout tests the agent is not supposed to read. Off unless `enabled` is true. See [Hidden tests](analyzers/hidden-tests.md) for what runs and how a private repo is cloned.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | `boolean` | `false` | Run the holdout suite during `check` / `score` / `report` |
+| `source` | `'directory' \| 'repo'` | — | Required when enabled |
+| `path` | `string` | — | Directory inside the project. Required for `source: 'directory'` |
+| `url` | `string` | — | Git URL. Required for `source: 'repo'` |
+| `branch` | `string` | `'main'` | Branch to clone |
+| `tool` | `'vitest'` | `'vitest'` | Project-local Vitest only |
+| `threshold` | `number` | `100` | Minimum pass rate. Below this fails when enforcement is `block` |
+| `enforcement` | `'block' \| 'warn'` | `'block'` | `warn` records the rate and does not fail the check on it |
 
 === "Local directory"
 

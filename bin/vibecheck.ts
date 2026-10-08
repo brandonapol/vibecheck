@@ -14,6 +14,7 @@ import type { MutationReport } from '../src/analyzers/mutation.js'
 import { runMutationForLanguages } from '../src/languages/mutation.js'
 import { languageForFile, resolveLanguages } from '../src/languages/registry.js'
 import { auditTarget, getChangedFiles, getFileAtRef, listWorktreeFilesContaining, readAuditedFile } from '../src/cli/worktree.js'
+import { runHiddenTests, type HiddenTestReport } from '../src/analyzers/hidden-tests.js'
 import { runInstalledHook } from '../src/hooks/pre-commit.js'
 import { collectStatus, formatStatus } from '../src/cli/status.js'
 import { protectedMessage, protectionFor } from '../src/cli/protected.js'
@@ -137,6 +138,17 @@ async function main() {
     const runMutation = parsed.flags.mutation || (!parsed.flags.semantic && config.mutation.enabled)
     const runSemantic = parsed.flags.semantic || (!parsed.flags.mutation && config.semanticDiff.enabled)
     const runTamper = !parsed.flags.mutation || parsed.flags.semantic === true
+    const runHidden = !parsed.flags.mutation && !parsed.flags.semantic && config.hiddenTests.enabled
+    let hiddenReport: HiddenTestReport | undefined
+
+    if (runHidden) {
+      try {
+        hiddenReport = await runHiddenTests(config, process.cwd(), process.env)
+      } catch (err) {
+        console.error('Hidden tests failed:', (err as Error).message)
+        process.exit(1)
+      }
+    }
 
     if (runMutation) {
       try {
@@ -220,7 +232,8 @@ async function main() {
       configViolations: resolved.configViolations,
       protectedViolations,
       tamperViolations,
-      ran: { mutation: runMutation, semanticDiff: runSemantic },
+      hidden: hiddenReport,
+      ran: { mutation: runMutation, semanticDiff: runSemantic, hiddenTests: runHidden },
     })
 
     if (parsed.command === 'score') {

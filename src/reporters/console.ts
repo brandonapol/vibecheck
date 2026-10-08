@@ -17,7 +17,9 @@ type ReportDetails = {
   pass?: boolean
   failures?: string[]
   /** Enabled in config, but not invoked on this run. */
-  skipped?: { mutation?: boolean; semanticDiff?: boolean }
+  skipped?: { mutation?: boolean; semanticDiff?: boolean; hiddenTests?: boolean }
+  hiddenThreshold?: number
+  hiddenFailures?: string[]
 }
 
 export function formatReport(
@@ -45,7 +47,9 @@ export function formatReport(
   }
 
   if (score.components.hiddenTests !== undefined) {
-    lines.push(`  Hidden Tests:         ${score.components.hiddenTests}%`)
+    lines.push(`  Hidden Tests:         ${score.components.hiddenTests}% (threshold: ${details.hiddenThreshold ?? 100})`)
+  } else if (details.skipped?.hiddenTests) {
+    lines.push('  Hidden Tests:         — (skipped)')
   }
 
   if (score.components.propertyTests !== undefined) {
@@ -81,6 +85,14 @@ export function formatReport(
     lines.push('  Tamper detected:')
     for (const v of details.tamperViolations) {
       lines.push(`    ${v.file} — ${v.kind}: ${v.detail}${v.blocking ? '' : ' (report only)'}`)
+    }
+  }
+
+  if (details.hiddenFailures && details.hiddenFailures.length > 0) {
+    lines.push('')
+    lines.push('  Hidden test failures:')
+    for (const name of details.hiddenFailures.slice(0, 20)) {
+      lines.push(`    ${name}`)
     }
   }
 

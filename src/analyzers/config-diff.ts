@@ -157,12 +157,79 @@ export function detectConfigWeakening(
   }
 
   detectLanguageWeakening(resolveLanguages(before), resolveLanguages(after), violations)
+  detectHiddenWeakening(before, after, violations)
 
   return violations
 }
 
 function removed(before: string[], after: string[]): string[] {
   return before.filter(e => !after.includes(e))
+}
+
+function detectHiddenWeakening(before: Config, after: Config, violations: ConfigWeakeningViolation[]): void {
+  const was = before.hiddenTests
+  const now = after.hiddenTests
+  if (!was.enabled) return
+  if (!now.enabled) {
+    violations.push({
+      field: 'hiddenTests.enabled',
+      before: true,
+      after: false,
+      detail: 'Hidden tests were disabled',
+    })
+    return
+  }
+  if (now.threshold < was.threshold) {
+    violations.push({
+      field: 'hiddenTests.threshold',
+      before: was.threshold,
+      after: now.threshold,
+      detail: `Hidden-test threshold reduced from ${was.threshold} to ${now.threshold}`,
+    })
+  }
+  if (was.enforcement === 'block' && now.enforcement === 'warn') {
+    violations.push({
+      field: 'hiddenTests.enforcement',
+      before: was.enforcement,
+      after: now.enforcement,
+      detail: `Hidden-test enforcement downgraded from 'block' to 'warn'`,
+    })
+  }
+  if (was.source !== now.source) {
+    violations.push({
+      field: 'hiddenTests.source',
+      before: was.source,
+      after: now.source,
+      detail: `Hidden-test source changed from '${was.source}' to '${now.source}'`,
+    })
+    return
+  }
+  if (was.source === 'directory' && now.source === 'directory' && was.path !== now.path) {
+    violations.push({
+      field: 'hiddenTests.path',
+      before: was.path,
+      after: now.path,
+      detail: `Hidden-test directory changed from '${was.path}' to '${now.path}'`,
+    })
+  }
+  if (was.source === 'repo' && now.source === 'repo') {
+    if (was.url !== now.url) {
+      violations.push({
+        field: 'hiddenTests.url',
+        before: was.url,
+        after: now.url,
+        detail: `Hidden-test repo changed from '${was.url}' to '${now.url}'`,
+      })
+    }
+    if (was.branch !== now.branch) {
+      violations.push({
+        field: 'hiddenTests.branch',
+        before: was.branch,
+        after: now.branch,
+        detail: `Hidden-test branch changed from '${was.branch}' to '${now.branch}'`,
+      })
+    }
+  }
 }
 
 function detectLanguageWeakening(

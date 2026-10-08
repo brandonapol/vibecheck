@@ -39,6 +39,16 @@ jobs:
 
       - run: npm ci
 
+      - name: Load hidden-tests deploy key
+        env:
+          HIDDEN_KEY: ${{ secrets.hidden-tests-deploy-key }}
+        run: |
+          if [ -n "$HIDDEN_KEY" ]; then
+            install -m 600 /dev/null "$RUNNER_TEMP/vibecheck-hidden-key"
+            printf '%s\n' "$HIDDEN_KEY" > "$RUNNER_TEMP/vibecheck-hidden-key"
+            echo "VIBECHECK_HIDDEN_TESTS_KEY=$RUNNER_TEMP/vibecheck-hidden-key" >> "$GITHUB_ENV"
+          fi
+
       - name: Run vibecheck
         # The config is read from the base branch, never from the PR under review.
         run: npx vibecheck check --threshold ${{ inputs.threshold }} --base origin/${{ github.base_ref || inputs.protected-branch }}

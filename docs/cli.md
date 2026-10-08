@@ -55,7 +55,7 @@ npx vibecheck check --threshold 90  # Override the composite score threshold
 npx vibecheck check --hook          # Pre-commit: staged files and enforcement only
 ```
 
-Exit code 0 when every gate passes, 1 otherwise. See [Pass/Fail](scoring.md#passfail) for the gates. In CI (the `CI` environment variable) the diff and file contents come from `HEAD`. Locally they come from the working tree.
+Exit code 0 when every gate passes, 1 otherwise. See [Pass/Fail](scoring.md#passfail) for the gates. In CI (the `CI` environment variable) the diff and file contents come from `HEAD`. Locally they come from the working tree. When `hiddenTests.enabled` is true, this command runs that suite; `--mutation`, `--semantic`, and `--hook` do not.
 
 | Flag | Description |
 |------|-------------|
