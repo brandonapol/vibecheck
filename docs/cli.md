@@ -18,6 +18,22 @@ Creates:
 - A pre-commit hook: appended to `.husky/pre-commit` when Husky is present, otherwise `.git/hooks/pre-commit`. An existing hook is kept; the vibecheck line is added. Skipped when the directory is not a git checkout.
 - Prints a CLAUDE.md snippet to stdout
 
+### `vibecheck status`
+
+List test files and whether each one exists on the protected branch. `protected` means an edit is enforced. `new` means the file is not on that branch yet.
+
+```bash
+npx vibecheck status
+```
+
+```
+vibecheck: test protection
+
+src/core/
+  protected  validator.test.ts
+  new        extra.test.ts
+```
+
 ### `vibecheck check`
 
 Run all enabled analyzers and report the composite integrity score.

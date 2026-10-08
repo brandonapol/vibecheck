@@ -15,12 +15,16 @@ import { runMutationForLanguages } from '../src/languages/mutation.js'
 import { languageForFile, resolveLanguages } from '../src/languages/registry.js'
 import { getChangedFiles, getFileAtRef, listWorktreeFilesContaining } from '../src/cli/worktree.js'
 import { runInstalledHook } from '../src/hooks/pre-commit.js'
+import { collectStatus, formatStatus } from '../src/cli/status.js'
+import { fileExistsInBranch } from '../src/core/resolver.js'
+import { execa } from 'execa'
 import { readFile } from 'node:fs/promises'
 
 const USAGE = `Usage: vibecheck <command> [options]
 
 Commands:
   init                  Initialize vibecheck in your project
+  status                Show which test files are protected
   check                 Run all enabled analyzers and report results
   score                 Output composite integrity score (0-100)
   report                Generate full integrity report
@@ -76,6 +80,15 @@ async function main() {
 
     console.log('\nAdd this to your CLAUDE.md:\n')
     console.log(result.claudeSnippet)
+    process.exit(0)
+  }
+
+  if (parsed.command === 'status') {
+    const config = await loadConfig()
+    const { stdout } = await execa('git', ['ls-files', '-c', '-o', '--exclude-standard'])
+    const files = stdout.split('\n').filter(Boolean)
+    const status = await collectStatus(files, config.testPatterns, file => fileExistsInBranch(file, config.protectedBranch))
+    console.log(formatStatus(status))
     process.exit(0)
   }
 
