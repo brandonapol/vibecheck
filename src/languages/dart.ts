@@ -3,7 +3,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHelperExtractor, type HelperSpec } from './helper.js'
-import { runMutationTest } from './mutation-test.js'
+import { runMutationTest } from './dart-mutation.js'
 import type { LanguageAdapter } from './types.js'
 
 /** `package:matcher` and `flutter_test` matchers on the shared scale. A bare
