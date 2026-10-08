@@ -22,6 +22,8 @@ export type MutationReport = {
   overallScore: number
   fileScores: Record<string, number>
   survivingMutants: SurvivedMutant[]
+  /** True when only the diff against the base ref was mutated. Not comparable to a full run. */
+  diffScoped?: boolean
 }
 
 /** A report that keeps its raw counts, so reports from several languages can
@@ -51,6 +53,41 @@ type StrykerReport = {
   files: Record<string, { mutants: StrykerMutant[] }>
 }
 
+/** What a mutant does to the shared score.
+ *  killed: the tests did not pass (including a timeout).
+ *  survived: the tests passed anyway.
+ *  uncovered: nothing executed the mutant.
+ *  ignored: not a verdict (does not compile, or was not run). */
+export type MutantKind = 'killed' | 'survived' | 'uncovered' | 'ignored'
+
+export function tallyKinds(kinds: readonly MutantKind[]): { killed: number; total: number; score: number } {
+  const counted = kinds.filter(kind => kind !== 'ignored')
+  const killed = counted.filter(kind => kind === 'killed').length
+  const total = counted.length
+  return { killed, total, score: total === 0 ? 100 : (killed / total) * 100 }
+}
+
+function strykerKind(status: string): MutantKind {
+  switch (status.toLowerCase()) {
+    case 'killed':
+    case 'timeout':
+    case 'runtimeerror':
+      return 'killed'
+    case 'survived':
+      return 'survived'
+    case 'nocoverage':
+      return 'uncovered'
+    case 'compileerror':
+    case 'ignored':
+      return 'ignored'
+    default:
+      throw new Error(
+        `Stryker mutant status '${status}' is not a finished result. ` +
+          'A pending or unknown status must not be scored as a kill.',
+      )
+  }
+}
+
 export function extractScores(report: StrykerReport): CountedMutationReport {
   const fileScores: Record<string, number> = {}
   const survivingMutants: SurvivedMutant[] = []
@@ -58,22 +95,21 @@ export function extractScores(report: StrykerReport): CountedMutationReport {
   let totalMutants = 0
 
   for (const [file, data] of Object.entries(report.files)) {
-    const killed = data.mutants.filter(m => m.status === 'Killed').length
-    const total = data.mutants.length
-
-    fileScores[file] = total === 0 ? 100 : (killed / total) * 100
-    totalKilled += killed
-    totalMutants += total
+    const kinds = data.mutants.map(mutant => strykerKind(mutant.status))
+    const tally = tallyKinds(kinds)
+    fileScores[file] = tally.score
+    totalKilled += tally.killed
+    totalMutants += tally.total
 
     for (const mutant of data.mutants) {
-      if (mutant.status === 'Survived') {
-        survivingMutants.push({
-          file,
-          mutator: mutant.mutatorName,
-          location: { line: mutant.location.start.line, column: mutant.location.start.column },
-          replacement: mutant.replacement,
-        })
-      }
+      const kind = strykerKind(mutant.status)
+      if (kind !== 'survived' && kind !== 'uncovered') continue
+      survivingMutants.push({
+        file,
+        mutator: mutant.mutatorName,
+        location: { line: mutant.location.start.line, column: mutant.location.start.column },
+        replacement: mutant.replacement,
+      })
     }
   }
 
@@ -89,12 +125,14 @@ export function extractScores(report: StrykerReport): CountedMutationReport {
 export function mergeMutationReports(reports: CountedMutationReport[]): CountedMutationReport {
   const killed = reports.reduce((sum, r) => sum + r.killed, 0)
   const total = reports.reduce((sum, r) => sum + r.total, 0)
+  const diffScoped = reports.some(report => report.diffScoped)
   return {
     overallScore: total === 0 ? 100 : (killed / total) * 100,
     fileScores: Object.assign({}, ...reports.map(r => r.fileScores)),
     survivingMutants: reports.flatMap(r => r.survivingMutants),
     killed,
     total,
+    ...(diffScoped ? { diffScoped: true } : {}),
   }
 }
 

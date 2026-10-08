@@ -35,6 +35,11 @@ jobs:
       - run: dart pub get && dart analyze && dart format --output=none --set-exit-if-changed . && dart test
         working-directory: helpers/dart_testast
 
+      - name: Install gremlins
+        run: |
+          go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
       - run: npm ci
       - run: npm run build
       - run: npm test

@@ -34,7 +34,8 @@ export function formatReport(
   lines.push('')
 
   if (score.components.mutation !== undefined) {
-    lines.push(`  Mutation Score:       ${score.components.mutation}% (threshold: ${details.mutationThreshold ?? threshold})`)
+    const scope = details.mutation?.diffScoped ? ', diff-scoped' : ''
+    lines.push(`  Mutation Score:       ${score.components.mutation}% (threshold: ${details.mutationThreshold ?? threshold}${scope})`)
   } else if (details.skipped?.mutation) {
     lines.push('  Mutation Score:       — (skipped)')
   }
