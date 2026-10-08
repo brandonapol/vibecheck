@@ -1,5 +1,10 @@
 import micromatch from 'micromatch'
 import type { Config } from '../config/schema.js'
+import {
+  DART_SUPPLEMENTAL_GLOBS,
+  GO_SUPPLEMENTAL_GLOBS,
+  TYPESCRIPT_SUPPLEMENTAL_GLOBS,
+} from '../core/supplemental-tests.js'
 import type { LanguageAdapter, ResolvedLanguage } from './types.js'
 import { typescriptAdapter } from './typescript.js'
 import { goAdapter } from './go.js'
@@ -58,7 +63,21 @@ export function resolveLanguages(config: Config): ResolvedLanguage[] {
   })
 }
 
-/** The first enabled language whose test patterns match `file`. */
+const SUPPLEMENTAL_BY_LANGUAGE: Record<string, string[]> = {
+  typescript: TYPESCRIPT_SUPPLEMENTAL_GLOBS,
+  go: GO_SUPPLEMENTAL_GLOBS,
+  dart: DART_SUPPLEMENTAL_GLOBS,
+}
+
+/** The first enabled language whose test patterns match `file`.
+ *  JavaScript and JSX tests are also claimed by TypeScript, and Go and Dart
+ *  tests by those languages, even when the configured globs omit them. */
 export function languageForFile(file: string, languages: ResolvedLanguage[]): ResolvedLanguage | null {
-  return languages.find(l => l.enabled && micromatch.isMatch(file, l.testPatterns)) ?? null
+  const path = file.replace(/\\/g, '/')
+  const direct = languages.find(l => l.enabled && micromatch.isMatch(path, l.testPatterns))
+  if (direct) return direct
+  return languages.find(l => {
+    const extra = SUPPLEMENTAL_BY_LANGUAGE[l.id]
+    return l.enabled && extra !== undefined && micromatch.isMatch(path, extra)
+  }) ?? null
 }

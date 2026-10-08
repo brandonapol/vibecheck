@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { parseArgs } from '../src/cli/commands.js'
+import { assertThreshold, parseArgs } from '../src/cli/commands.js'
 import { runCheck } from '../src/cli/runner.js'
 import { scaffoldProject } from '../src/cli/init.js'
 import { loadConfig } from '../src/config/loader.js'
@@ -21,6 +21,8 @@ import { auditRange, findAuditHits, formatAudit, loadAuditCommits } from '../src
 import { collectStatus, formatStatus } from '../src/cli/status.js'
 import { protectedMessage, protectionFor } from '../src/cli/protected.js'
 import { fileExistsInBranch } from '../src/core/resolver.js'
+import { patternsForConfig } from '../src/core/test-patterns.js'
+import { githubAnnotationLines } from '../src/reporters/github.js'
 import { execa } from 'execa'
 
 const USAGE = `Usage: vibecheck <command> [options]
@@ -107,7 +109,7 @@ async function main() {
     const config = await loadConfig()
     const { stdout } = await execa('git', ['ls-files', '-c', '-o', '--exclude-standard'])
     const files = stdout.split('\n').filter(Boolean)
-    const status = await collectStatus(files, config.testPatterns, file => fileExistsInBranch(file, config.protectedBranch))
+    const status = await collectStatus(files, patternsForConfig(config), file => fileExistsInBranch(file, config.protectedBranch))
     console.log(formatStatus(status))
     process.exit(0)
   }
@@ -118,7 +120,7 @@ async function main() {
       process.exit(2)
     }
     const config = await loadConfig()
-    const protection = await protectionFor(parsed.flags.file, config.testPatterns, file =>
+    const protection = await protectionFor(parsed.flags.file, patternsForConfig(config), file =>
       fileExistsInBranch(file, config.protectedBranch),
     )
     if (protection === 'protected') {
@@ -160,6 +162,13 @@ async function main() {
   }
 
   if (parsed.command === 'check' || parsed.command === 'score' || parsed.command === 'report') {
+    try {
+      assertThreshold(parsed.flags.threshold)
+    } catch (err) {
+      console.error((err as Error).message)
+      process.exit(1)
+    }
+
     const resolved = await resolveCheckConfig({ head: headConfig, env: process.env, baseRef: parsed.flags.base })
     const config = resolved.config
     const compareRef = resolved.baseRef ?? config.protectedBranch
@@ -198,7 +207,7 @@ async function main() {
     const checkProtected = !parsed.flags.mutation && protectedFiles.length + required.length > 0
     const target = auditTarget(process.env)
     const changedFiles = runSemantic || checkProtected || runTamper
-      ? await getChangedFiles(compareRef, target === 'HEAD' ? 'HEAD' : undefined)
+      ? await getChangedFiles(compareRef, target === 'HEAD' ? 'HEAD' : undefined, { noRenames: true })
       : []
     let protectedViolations: ProtectedTestViolation[] = []
 
@@ -272,6 +281,9 @@ async function main() {
       hidden: hiddenReport,
       ran: { mutation: runMutation, semanticDiff: runSemantic, hiddenTests: runHidden },
     })
+
+    const annotations = githubAnnotationLines(result.failures, process.env)
+    if (annotations.length > 0) console.error(annotations.join('\n'))
 
     if (parsed.command === 'score') {
       console.log(result.score.total)

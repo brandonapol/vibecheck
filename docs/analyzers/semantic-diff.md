@@ -10,7 +10,9 @@ The semantic diff analyzer detects assertion weakening between commits. When an 
 4. Compare the **sorted multiset** of assertion strengths rank by rank: reordering assertions is not weakening, and padding with weak assertions cannot hide a removed strong one
 5. Anything the AST cannot statically resolve — like `expect(x)[method]()` — fails closed as a `suspicious-assertion` violation
 
-Deleting a whole test file reports `test-deletion` for every test that was in it. The empty side is not sent to the language parser: Go and Dart reject an empty file, and that error would hide the deletion. A file that does not exist on the base ref is scored only for weak, tautological, and neutralized assertions in the tests it adds. It is not treated as an edit of a protected test. The pre-commit hook still allows that new file, because `vibecheck check --hook` does not run semantic diff.
+Deleting a whole test file reports `test-deletion` for every test that was in it. The empty side is not sent to the language parser: Go and Dart reject an empty file, and that error would hide the deletion. A rename is listed as a deletion of the old path and an addition of the new one (`git diff --no-renames`), so the old tests are still `test-deletion`. A file that does not exist on the base ref is scored only for weak, tautological, and neutralized assertions in the tests it adds. It is not treated as an edit of a protected test. The pre-commit hook still allows that new file, because `vibecheck check --hook` does not run semantic diff.
+
+`.test` and `.spec` files ending in `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, or `.cjs`, and code files under `__tests__`, are claimed by the TypeScript adapter when TypeScript is enabled, including when `testPatterns` only names `.ts`. Go and Dart tests are claimed when that language is enabled.
 
 ## Go
 

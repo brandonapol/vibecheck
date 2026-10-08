@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { Config } from '../config/schema.js'
 import { getStagedFiles } from '../core/resolver.js'
+import { patternsForConfig } from '../core/test-patterns.js'
 import { classifyStaged } from './pre-commit.js'
 
 export type Phase = 'phase1' | 'phase2'
@@ -39,6 +40,6 @@ export async function runCommitMsgHook(
   readStaged: () => Promise<string[]> = getStagedFiles,
 ): Promise<void> {
   const message = readFileSync(messageFile, 'utf-8')
-  const next = applyPhaseTag(message, await readStaged(), config.testPatterns, config.hooks.commitMsg)
+  const next = applyPhaseTag(message, await readStaged(), patternsForConfig(config), config.hooks.commitMsg)
   if (next !== message) writeFileSync(messageFile, next)
 }
