@@ -6,7 +6,7 @@ import { scaffoldProject } from '../src/cli/init.js'
 import { loadConfig } from '../src/config/loader.js'
 import { resolveCheckConfig } from '../src/cli/config-source.js'
 import { checkProtectedTests, isProtectedTestFile, type ProtectedTestViolation } from '../src/analyzers/protected-tests.js'
-import { detectWeakeningWithAdapter, type WeakeningViolation } from '../src/analyzers/semantic-diff.js'
+import { detectWeakeningWithAdapter, semanticDiffSides, type WeakeningViolation } from '../src/analyzers/semantic-diff.js'
 import { detectGoldenUpdates, extraGoldenTestFiles, resolveRelatedFile, type GoldenSide } from '../src/analyzers/golden-diff.js'
 import { detectTamper, tamperCandidate, type TamperViolation } from '../src/analyzers/tamper.js'
 import type { ExtractedTest } from '../src/analyzers/test-ast.js'
@@ -182,9 +182,10 @@ async function main() {
         if (!language) continue
         const before = await getFileAtRef(file, compareRef)
         const after = (await readAuditedFile(file, target)) ?? ''
-        if (before && after) {
-          semanticViolations.push(...(await detectWeakeningWithAdapter(before, after, file, language.adapter)))
-          if (runSemantic) {
+        const sides = semanticDiffSides(before, after)
+        if (sides) {
+          semanticViolations.push(...(await detectWeakeningWithAdapter(sides.before, sides.after, file, language.adapter)))
+          if (runSemantic && sides.after.trim()) {
             const [beforeTests, afterTests] = await Promise.all([
               language.adapter.extractTests(before, file),
               language.adapter.extractTests(after, file),

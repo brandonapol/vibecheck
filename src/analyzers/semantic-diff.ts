@@ -294,6 +294,12 @@ export type TestExtraction = {
   setup: SetupStatement[]
 }
 
+/** A new file is not a weakening. A file missing on the audited side still is. */
+export function semanticDiffSides(before: string, after: string): { before: string; after: string } | null {
+  if (!before) return null
+  return { before, after }
+}
+
 /** TypeScript entry point, kept synchronous for existing callers. */
 export function detectWeakeningInDiff(
   before: string,
@@ -314,6 +320,15 @@ export async function detectWeakeningWithAdapter(
   file: string,
   adapter: LanguageAdapter,
 ): Promise<WeakeningViolation[]> {
+  const strength = (matcher: string) => adapter.assertionStrength(matcher)
+  // An empty file does not parse in Go or Dart. Treat it as no tests.
+  if (after.trim() === '') {
+    const [tests, setup] = await Promise.all([
+      adapter.extractTests(before, file),
+      adapter.extractSetup(before, file),
+    ])
+    return compareExtractions({ tests, setup }, { tests: [], setup: [] }, file, strength)
+  }
   const [beforeTests, beforeSetup, afterTests, afterSetup] = await Promise.all([
     adapter.extractTests(before, file),
     adapter.extractSetup(before, file),
@@ -324,7 +339,7 @@ export async function detectWeakeningWithAdapter(
     { tests: beforeTests, setup: beforeSetup },
     { tests: afterTests, setup: afterSetup },
     file,
-    matcher => adapter.assertionStrength(matcher),
+    strength,
   )
 }
 
