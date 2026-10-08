@@ -24,10 +24,7 @@ describe('loadConfig', () => {
 
   it('merges partial user config with defaults', async () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true)
-    const mockConfig = { mutation: { threshold: 90 } }
-    vi.doMock('/fake/vibecheck.config.ts', () => ({ default: mockConfig }))
-
-    const config = await loadConfig('/fake')
+    const config = await loadConfig('/fake', async () => ({ default: { mutation: { threshold: 90 } } }))
     expect(config.mutation.threshold).toBe(90)
     expect(config.mutation.tool).toBe('stryker')
     expect(config.protectedBranch).toBe('main')
@@ -35,10 +32,8 @@ describe('loadConfig', () => {
 
   it('throws on invalid config file contents', async () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true)
-    vi.doMock('/bad/vibecheck.config.ts', () => ({
-      default: { mutation: { threshold: 200 } },
-    }))
-
-    await expect(loadConfig('/bad')).rejects.toThrow()
+    await expect(
+      loadConfig('/bad', async () => ({ default: { mutation: { threshold: 200 } } })),
+    ).rejects.toThrow()
   })
 })
