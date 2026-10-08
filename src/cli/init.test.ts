@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, existsSync, readFileSync, mkdirSync, writeFileSync, statSync } from 'node:fs'
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -74,5 +74,39 @@ describe('scaffoldProject', () => {
     const result = await scaffoldProject(tmpDir)
     expect(result.claudeSnippet).toContain('Test Integrity Protocol')
     expect(result.claudeSnippet).toContain('Mutation testing')
+  })
+
+  it('skips the hook when the directory is not a git repo', async () => {
+    const result = await scaffoldProject(tmpDir)
+    expect(result.hook).toEqual({ path: '.git/hooks/pre-commit', action: 'skipped' })
+  })
+
+  it('installs .git/hooks/pre-commit without replacing an existing hook', async () => {
+    mkdirSync(join(tmpDir, '.git', 'hooks'), { recursive: true })
+    const created = await scaffoldProject(tmpDir)
+    const hook = join(tmpDir, '.git', 'hooks', 'pre-commit')
+    expect(created.hook.action).toBe('created')
+    expect(readFileSync(hook, 'utf-8')).toContain('vibecheck check --hook')
+    expect(statSync(hook).mode & 0o111).not.toBe(0)
+
+    writeFileSync(hook, '#!/bin/sh\necho existing\n')
+    const appended = await scaffoldProject(tmpDir)
+    const text = readFileSync(hook, 'utf-8')
+    expect(appended.hook.action).toBe('appended')
+    expect(text).toContain('echo existing')
+    expect(text).toContain('vibecheck check --hook')
+
+    const again = await scaffoldProject(tmpDir)
+    expect(again.hook.action).toBe('unchanged')
+  })
+
+  it('appends to a Husky hook instead of writing .git/hooks', async () => {
+    mkdirSync(join(tmpDir, '.git', 'hooks'), { recursive: true })
+    mkdirSync(join(tmpDir, '.husky'))
+    writeFileSync(join(tmpDir, '.husky', 'pre-commit'), '#!/bin/sh\nnpx lint-staged\n')
+    const result = await scaffoldProject(tmpDir)
+    expect(result.hook).toEqual({ path: '.husky/pre-commit', action: 'appended' })
+    expect(existsSync(join(tmpDir, '.git', 'hooks', 'pre-commit'))).toBe(false)
+    expect(readFileSync(join(tmpDir, '.husky', 'pre-commit'), 'utf-8')).toContain('npx lint-staged')
   })
 })

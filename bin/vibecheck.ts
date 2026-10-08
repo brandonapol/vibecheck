@@ -70,6 +70,14 @@ async function main() {
       console.log('Added .github/workflows/vibecheck.yml')
     }
 
+    if (result.hook.action === 'created') {
+      console.log(`Installed ${result.hook.path}`)
+    } else if (result.hook.action === 'appended') {
+      console.log(`Appended vibecheck to ${result.hook.path}`)
+    } else if (result.hook.action === 'skipped') {
+      console.log('Skipped the git hook (not a git repository, and Husky is not installed)')
+    }
+
     console.log('\nAdd this to your CLAUDE.md:\n')
     console.log(result.claudeSnippet)
     process.exit(0)

@@ -15,6 +15,7 @@ Creates:
 - `vibecheck.config.ts` with default settings
 - `.vibecheck-hidden/` directory for hidden tests
 - `.github/workflows/vibecheck.yml` (if `.github/workflows/` exists)
+- A pre-commit hook: appended to `.husky/pre-commit` when Husky is present, otherwise `.git/hooks/pre-commit`. An existing hook is kept; the vibecheck line is added. Skipped when the directory is not a git checkout.
 - Prints a CLAUDE.md snippet to stdout
 
 ### `vibecheck check`
