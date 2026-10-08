@@ -233,6 +233,7 @@ class _Extractor {
       'assertions': scanner.assertions,
       'suspicious': <String>[],
       'bodyKey': body == null ? '' : _key(body, masked: scanner.masked),
+      'relatedFiles': scanner.relatedFiles,
     });
   }
 
@@ -322,6 +323,7 @@ class _AssertionScanner extends RecursiveAstVisitor<void> {
   final _Extractor extractor;
   final assertions = <Map<String, Object?>>[];
   final masked = <AstNode, String>{};
+  final relatedFiles = <String>[];
   int _conditional = 0;
 
   void _conditionally(AstNode? node) {
@@ -421,6 +423,10 @@ class _AssertionScanner extends RecursiveAstVisitor<void> {
     final actual = positional[0];
     final matcher = positional[1];
     final kind = _classify(matcher);
+    final golden = _goldenLiteral(matcher);
+    if (golden != null && !relatedFiles.contains(golden)) {
+      relatedFiles.add(golden);
+    }
     masked[call] = '<assertion>';
     assertions.add({
       'matcher': kind.name,
@@ -432,6 +438,19 @@ class _AssertionScanner extends RecursiveAstVisitor<void> {
           '${call.methodName.name}(${extractor._key(actual)}|${extractor._key(matcher)})',
       'source': extractor._source(call),
     });
+  }
+
+  /// A string literal passed to `matchesGoldenFile`. A computed path is not
+  /// resolvable here, so it is left out rather than guessed.
+  String? _goldenLiteral(Expression matcher) {
+    if (matcher is! MethodInvocation ||
+        matcher.methodName.name != 'matchesGoldenFile') {
+      return null;
+    }
+    final arg = matcher.argumentList.arguments
+        .whereType<Expression>()
+        .firstOrNull;
+    return arg is SimpleStringLiteral ? arg.value : null;
   }
 
   ({String name}) _classify(Expression matcher) {

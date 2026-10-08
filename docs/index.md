@@ -2,7 +2,7 @@
 
 **A CI-native test integrity pipeline that prevents AI coding agents from gaming their own test suites.**
 
-vibecheck measures test *quality*, not just test *existence*. It catches the ways AI agents cheat — weak assertions, deleted tests, tautological checks — and blocks them before they ship.
+vibecheck measures test *quality*, not just test *existence*. It catches the ways AI agents cheat — weak assertions, deleted tests, tautological checks — and blocks them before they ship. The block that holds is CI on the protected branch. A local hook is feedback, not enforcement. See [Threat model](threat-model.md).
 
 ## The Problem
 

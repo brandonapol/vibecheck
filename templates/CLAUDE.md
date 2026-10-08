@@ -16,3 +16,5 @@ Guidelines:
 - Do not add `.skip` to existing tests
 - Do not reduce the number of assertions in a test block
 - Write tests first, then implementation — never in the same commit
+
+When probing a test or an analyzer with vitest, run it from the repo root. Never pass `--root /` or any root above the repository: vitest will try to crawl the whole filesystem.

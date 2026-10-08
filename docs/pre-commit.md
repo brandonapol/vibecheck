@@ -1,6 +1,6 @@
 # Pre-commit Hook
 
-vibecheck includes a pre-commit hook that enforces the two-phase commit protocol and protects configuration files.
+vibecheck includes a pre-commit hook that enforces the two-phase commit protocol and protects configuration files. The hook is a guardrail. It is not the enforcement boundary — see [Threat model](threat-model.md).
 
 ## What It Enforces
 

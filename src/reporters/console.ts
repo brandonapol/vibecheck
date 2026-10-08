@@ -14,6 +14,8 @@ type ReportDetails = {
   /** The overall verdict when gates other than the score decide it. */
   pass?: boolean
   failures?: string[]
+  /** Enabled in config, but not invoked on this run. */
+  skipped?: { mutation?: boolean; semanticDiff?: boolean }
 }
 
 export function formatReport(
@@ -29,11 +31,15 @@ export function formatReport(
 
   if (score.components.mutation !== undefined) {
     lines.push(`  Mutation Score:       ${score.components.mutation}% (threshold: ${details.mutationThreshold ?? threshold})`)
+  } else if (details.skipped?.mutation) {
+    lines.push('  Mutation Score:       — (skipped)')
   }
 
   if (score.components.semanticDiff !== undefined) {
     const label = score.components.semanticDiff === 100 ? 'Clean' : `${score.components.semanticDiff}%`
     lines.push(`  Semantic Diff:        ${label}`)
+  } else if (details.skipped?.semanticDiff) {
+    lines.push('  Semantic Diff:        — (skipped)')
   }
 
   if (score.components.hiddenTests !== undefined) {

@@ -76,11 +76,37 @@ describe('fileExistsInBranch', () => {
     expect(mockExeca).toHaveBeenCalledWith('git', ['show', 'origin/main:src/foo.test.ts'])
   })
 
-  it('returns false when file does not exist in the branch', async () => {
-    mockExeca.mockRejectedValueOnce(new Error('fatal: path not found'))
+  it('returns false when the path is absent from the branch', async () => {
+    mockExeca.mockRejectedValueOnce(Object.assign(
+      new Error('fail'),
+      { stderr: "fatal: path 'src/new.test.ts' does not exist in 'origin/main'" },
+    ))
 
     const exists = await fileExistsInBranch('src/new.test.ts', 'main')
     expect(exists).toBe(false)
+  })
+
+  it('throws when git itself fails, instead of reporting the file as unprotected', async () => {
+    mockExeca.mockRejectedValueOnce(Object.assign(new Error('fail'), { stderr: 'fatal: not a git repository' }))
+    await expect(fileExistsInBranch('src/foo.test.ts', 'main')).rejects.toThrow(/not a git repository/)
+  })
+
+  it('falls back to the local branch when origin/<branch> does not exist', async () => {
+    mockExeca
+      .mockRejectedValueOnce(Object.assign(new Error('fail'), { stderr: "fatal: invalid object name 'origin/main'." }))
+      .mockResolvedValueOnce({} as any)
+
+    const exists = await fileExistsInBranch('src/foo.test.ts', 'main')
+    expect(exists).toBe(true)
+    expect(mockExeca).toHaveBeenLastCalledWith('git', ['show', 'main:src/foo.test.ts'])
+  })
+
+  it('throws when neither the remote nor the local protected branch exists', async () => {
+    mockExeca
+      .mockRejectedValueOnce(Object.assign(new Error('fail'), { stderr: "fatal: invalid object name 'origin/main'." }))
+      .mockRejectedValueOnce(Object.assign(new Error('fail'), { stderr: "fatal: invalid object name 'main'." }))
+
+    await expect(fileExistsInBranch('src/foo.test.ts', 'main')).rejects.toThrow(/was not found/)
   })
 })
 
@@ -93,7 +119,10 @@ describe('getProtectedPaths', () => {
     // fileExistsInBranch calls for each test file
     mockExeca
       .mockResolvedValueOnce({} as any) // src/existing.test.ts exists
-      .mockRejectedValueOnce(new Error('not found')) // src/new.test.ts does not
+      .mockRejectedValueOnce(Object.assign(
+        new Error('fail'),
+        { stderr: "fatal: path 'src/new.test.ts' does not exist in 'origin/main'" },
+      )) // src/new.test.ts does not
 
     const result = await getProtectedPaths(
       ['src/existing.test.ts', 'src/new.test.ts', 'src/impl.ts'],
@@ -116,7 +145,10 @@ describe('getProtectedPaths', () => {
   })
 
   it('returns empty array when all test files are new', async () => {
-    mockExeca.mockRejectedValueOnce(new Error('not found'))
+    mockExeca.mockRejectedValueOnce(Object.assign(
+      new Error('fail'),
+      { stderr: "fatal: path 'src/brand-new.test.ts' does not exist in 'origin/main'" },
+    ))
 
     const result = await getProtectedPaths(
       ['src/brand-new.test.ts'],

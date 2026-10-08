@@ -21,6 +21,7 @@ export type WeakeningPattern =
   | 'test-body-changed'
   | 'setup-changed'
   | 'assertion-neutralized'
+  | 'golden-updated'
 
 export type WeakeningViolation = {
   file: string

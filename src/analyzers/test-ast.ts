@@ -21,6 +21,8 @@ export type ExtractedTest = {
   suspicious: string[]
   /** Fingerprint of the body and any `.each` table, with assertions removed. */
   bodyKey: string
+  /** Paths a test pins outside itself, as written (e.g. a Flutter golden). */
+  relatedFiles?: string[]
 }
 
 /** A non-test statement at file or describe level (consts, helpers, hooks). */

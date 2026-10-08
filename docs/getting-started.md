@@ -27,6 +27,8 @@ npx vibecheck check
 
 This runs all enabled analyzers and reports a composite integrity score. By default, mutation testing and semantic diff analysis are enabled.
 
+On a laptop this is feedback. The check that agents cannot skip is the same command as a **required status check** on the protected branch. See [Threat model](threat-model.md).
+
 ## Understanding the Output
 
 ```

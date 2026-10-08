@@ -12,6 +12,16 @@ Mutation testing is the strongest single signal for test quality. It works by ma
 
 The mutation score is: `killed / total * 100`
 
+## Installing Stryker
+
+vibecheck runs the `stryker` binary in the project's `node_modules/.bin`. It does not call `npx stryker`: with nothing installed locally, that name resolves to the abandoned `stryker@1.0.1` package, not mutation testing.
+
+```bash
+npm install --save-dev @stryker-mutator/core @stryker-mutator/vitest-runner
+```
+
+If the binary is missing, `vibecheck check --mutation` fails. It does not report a score of 100.
+
 ## Why It Catches Agents
 
 An agent that writes `expect(result).toBeDefined()` will get a low mutation score because the assertion passes regardless of what `result` actually contains. The agent would need to write `expect(result).toBe(42)` to kill the mutants.

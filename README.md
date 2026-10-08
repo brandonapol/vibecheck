@@ -11,7 +11,7 @@ AI coding agents (Claude Code, Copilot, Cursor, etc.) have full context of both 
 - Deleting or skipping tests that are hard to satisfy
 - Hardcoding return values that satisfy specific example-based test cases
 
-Pre-commit hooks that lock test files are a **logical** constraint — the agent understands the rule and routes around it. vibecheck uses **structural** constraints that are impossible to game.
+Pre-commit hooks that lock test files are a **guardrail** for cooperative agents. They are one command away from being skipped (`--no-verify`, a different `core.hooksPath`). Enforcement is CI on the protected branch, required as a status check, with the config read from that branch. See [docs/threat-model.md](docs/threat-model.md).
 
 ## How It Works
 

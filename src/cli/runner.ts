@@ -14,6 +14,9 @@ export type AnalyzerInputs = {
   configViolations?: ConfigWeakeningViolation[]
   /** Findings in protected tests; any entry fails, whatever the enforcement. */
   protectedViolations?: ProtectedTestViolation[]
+  /** Which analyzers actually ran. Omitted means ran, so a bare score still counts.
+   *  A skipped analyzer must not be reported as a perfect score. */
+  ran?: { mutation?: boolean; semanticDiff?: boolean }
 }
 
 export type CheckResult = {
@@ -35,7 +38,9 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
   }
 
   const enabledPatterns = new Set(config.semanticDiff.patterns)
-  const semanticViolations = config.semanticDiff.enabled
+  const mutationRan = inputs.ran?.mutation ?? true
+  const semanticRan = inputs.ran?.semanticDiff ?? true
+  const semanticViolations = config.semanticDiff.enabled && semanticRan
     ? inputs.semanticViolations.filter(v => enabledPatterns.has(v.pattern))
     : []
   const weakeningRate = Math.min(semanticViolations.length * VIOLATION_WEIGHT, 1)
@@ -43,11 +48,11 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
   const results: AnalyzerResults = {
     mutation: {
       score: inputs.mutationScore,
-      enabled: config.mutation.enabled,
+      enabled: config.mutation.enabled && mutationRan,
     },
     semanticDiff: {
       weakeningRate,
-      enabled: config.semanticDiff.enabled,
+      enabled: config.semanticDiff.enabled && semanticRan,
     },
     hiddenTests: {
       passRate: 0,
@@ -67,7 +72,7 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
   }
 
   // The score is a quality signal; these are gates it cannot outweigh.
-  if (config.mutation.enabled) {
+  if (config.mutation.enabled && mutationRan) {
     const report = inputs.mutationReport ?? { overallScore: inputs.mutationScore, fileScores: {}, survivingMutants: [] }
     const mutation = checkMutationThresholds(report, config.mutation)
     if (!mutation.ok) {
@@ -81,7 +86,7 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
     }
   }
 
-  if (config.semanticDiff.enforcement === 'block' && semanticViolations.length > 0) {
+  if (config.semanticDiff.enforcement === 'block' && semanticRan && semanticViolations.length > 0) {
     failures.push(`${semanticViolations.length} assertion weakening violation(s) with enforcement 'block'`)
   }
 
@@ -102,6 +107,10 @@ export async function runCheck(config: Config, inputs: AnalyzerInputs): Promise<
     protectedViolations: inputs.protectedViolations,
     pass,
     failures,
+    skipped: {
+      mutation: config.mutation.enabled && !mutationRan,
+      semanticDiff: config.semanticDiff.enabled && !semanticRan,
+    },
   })
 
   return { pass, score, failures, report }

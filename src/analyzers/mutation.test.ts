@@ -13,13 +13,15 @@ vi.mock('execa', () => ({
 
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
+  access: vi.fn(),
 }))
 
 import { execa } from 'execa'
-import { readFile } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
 
 const mockExeca = vi.mocked(execa)
 const mockReadFile = vi.mocked(readFile)
+const mockAccess = vi.mocked(access)
 
 const defaultMutationConfig: MutationConfig = {
   enabled: true,
@@ -138,19 +140,28 @@ describe('runMutationAnalysis', () => {
     vi.restoreAllMocks()
   })
 
-  it('runs stryker and parses the report', async () => {
+  it('runs the project-local stryker binary and parses the report', async () => {
+    mockAccess.mockResolvedValueOnce(undefined)
     mockExeca.mockResolvedValueOnce({} as any)
     mockReadFile.mockResolvedValueOnce(JSON.stringify(sampleStrykerReport))
 
-    const report = await runMutationAnalysis(defaultMutationConfig)
+    const report = await runMutationAnalysis(defaultMutationConfig, '/proj')
     expect(report.overallScore).toBe(80)
-    expect(mockExeca).toHaveBeenCalledWith(
-      'npx',
-      expect.arrayContaining(['stryker', 'run']),
-    )
+    const [command, args] = mockExeca.mock.calls[0]
+    expect(command).toBe('/proj/node_modules/.bin/stryker')
+    expect(args).toEqual(expect.arrayContaining(['run']))
+    expect(String(command)).not.toContain('npx')
+  })
+
+  it('refuses to invoke npx when stryker is not installed locally', async () => {
+    mockAccess.mockRejectedValueOnce(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+
+    await expect(runMutationAnalysis(defaultMutationConfig, '/proj')).rejects.toThrow(/@stryker-mutator\/core/)
+    expect(mockExeca).not.toHaveBeenCalled()
   })
 
   it('throws when stryker fails', async () => {
+    mockAccess.mockResolvedValueOnce(undefined)
     mockExeca.mockRejectedValueOnce(new Error('stryker crashed'))
 
     await expect(runMutationAnalysis(defaultMutationConfig)).rejects.toThrow('stryker crashed')

@@ -103,7 +103,7 @@ describe('validate', () => {
     }
   })
 
-  it('returns ok when protected test files are staged alone (no impl)', async () => {
+  it('blocks a protected test edited with no implementation file (#56)', async () => {
     const result = await validate(
       defaultConfig,
       makeOptions({
@@ -113,10 +113,12 @@ describe('validate', () => {
           'test: update tests\n\nCo-Authored-By: Claude <noreply@anthropic.com>',
       }),
     )
-    // Protected tests modified alone is allowed — the pre-commit hook
-    // handles the two-phase check. The validator checks protected tests
-    // modified alongside implementation.
-    expect(result).toEqual({ ok: true })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.violations).toEqual([
+        { file: 'src/foo.test.ts', reason: 'protected-test-modified', phase: 'implementation' },
+      ])
+    }
   })
 
   it('identifies which trailer matched for agent commits', async () => {
