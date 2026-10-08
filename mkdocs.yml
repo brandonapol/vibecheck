@@ -63,6 +63,7 @@ nav:
   - Pre-commit Hook: pre-commit.md
   - CI Integration: ci.md
   - Threat Model: threat-model.md
+  - Claude Code Hook: claude-hook.md
   - CLAUDE.md Template: claude-template.md
   - Adversarial Testing: adversarial.md
   - API Reference: api.md

@@ -16,6 +16,7 @@ import { languageForFile, resolveLanguages } from '../src/languages/registry.js'
 import { auditTarget, getChangedFiles, getFileAtRef, listWorktreeFilesContaining, readAuditedFile } from '../src/cli/worktree.js'
 import { runInstalledHook } from '../src/hooks/pre-commit.js'
 import { collectStatus, formatStatus } from '../src/cli/status.js'
+import { protectedMessage, protectionFor } from '../src/cli/protected.js'
 import { fileExistsInBranch } from '../src/core/resolver.js'
 import { execa } from 'execa'
 
@@ -24,6 +25,7 @@ const USAGE = `Usage: vibecheck <command> [options]
 Commands:
   init                  Initialize vibecheck in your project
   status                Show which test files are protected
+  protected --file <p>  Exit 2 when <p> is a protected test
   check                 Run all enabled analyzers and report results
   score                 Output composite integrity score (0-100)
   report                Generate full integrity report
@@ -77,6 +79,14 @@ async function main() {
       console.log('Skipped the git hook (not a git repository, and Husky is not installed)')
     }
 
+    if (result.claudeHook.action === 'installed') {
+      console.log('Installed .claude/hooks/vibecheck-protected.sh and .claude/settings.json')
+    } else if (result.claudeHook.action === 'snippet') {
+      console.log('Claude Code settings already exist. Add the PreToolUse hook from templates/claude-settings.json (init will not rewrite settings.json).')
+    } else if (result.claudeHook.action === 'unchanged') {
+      console.log('Claude Code protected-test hook already configured')
+    }
+
     console.log('\nAdd this to your CLAUDE.md:\n')
     console.log(result.claudeSnippet)
     process.exit(0)
@@ -88,6 +98,22 @@ async function main() {
     const files = stdout.split('\n').filter(Boolean)
     const status = await collectStatus(files, config.testPatterns, file => fileExistsInBranch(file, config.protectedBranch))
     console.log(formatStatus(status))
+    process.exit(0)
+  }
+
+  if (parsed.command === 'protected') {
+    if (!parsed.flags.file) {
+      console.error('vibecheck protected requires --file <path>')
+      process.exit(2)
+    }
+    const config = await loadConfig()
+    const protection = await protectionFor(parsed.flags.file, config.testPatterns, file =>
+      fileExistsInBranch(file, config.protectedBranch),
+    )
+    if (protection === 'protected') {
+      console.error(protectedMessage(parsed.flags.file, config.protectedBranch))
+      process.exit(2)
+    }
     process.exit(0)
   }
 

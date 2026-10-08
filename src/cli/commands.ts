@@ -1,5 +1,5 @@
 export type CliCommand = {
-  command: 'check' | 'score' | 'report' | 'init' | 'status' | 'help'
+  command: 'check' | 'score' | 'report' | 'init' | 'status' | 'protected' | 'help'
   flags: {
     mutation?: boolean
     semantic?: boolean
@@ -7,10 +7,12 @@ export type CliCommand = {
     base?: string
     /** Pre-commit entry: staged files and enforcement, no analyzers. */
     hook?: boolean
+    /** For `protected`: the path to classify. */
+    file?: string
   }
 }
 
-const VALID_COMMANDS = new Set(['check', 'score', 'report', 'init', 'status'])
+const VALID_COMMANDS = new Set(['check', 'score', 'report', 'init', 'status', 'protected'])
 
 export function parseArgs(args: string[]): CliCommand {
   const [command, ...rest] = args
@@ -30,6 +32,7 @@ export function parseArgs(args: string[]): CliCommand {
     } else if (arg === '--base' && i + 1 < rest.length) {
       flags.base = rest[++i]
     } else if (arg === '--hook') flags.hook = true
+    else if (arg === '--file' && i + 1 < rest.length) flags.file = rest[++i]
   }
 
   return { command: command as CliCommand['command'], flags }
