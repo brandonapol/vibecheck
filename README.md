@@ -160,8 +160,7 @@ Assertion strength rankings: `toBe` (10), `toEqual` (9), `toStrictEqual` (10), `
 - Semantic diff as its own gate. CI reads the config from the base branch and fails when that config is weakened.
 - Protected tests, `vibecheck status`, `vibecheck audit`, and an opt-in commit-msg phase tag.
 - Hidden tests. Go and Dart/Flutter semantic diff. Go mutation testing via gremlins.
-
-Dart mutation testing via mutation_test is on main and ships in the next release.
+- Dart mutation testing via mutation_test is on main and ships in the next release.
 - GitHub Actions and GitLab CI templates. This repo runs the semantic check and a coverage floor on its own source.
 - `vibecheck.config.ts` loads under plain Node.
 
