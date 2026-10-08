@@ -1,5 +1,5 @@
 export type CliCommand = {
-  command: 'check' | 'score' | 'report' | 'init' | 'status' | 'protected' | 'help'
+  command: 'check' | 'score' | 'report' | 'init' | 'status' | 'protected' | 'commit-msg' | 'help'
   flags: {
     mutation?: boolean
     semantic?: boolean
@@ -12,7 +12,7 @@ export type CliCommand = {
   }
 }
 
-const VALID_COMMANDS = new Set(['check', 'score', 'report', 'init', 'status', 'protected'])
+const VALID_COMMANDS = new Set(['check', 'score', 'report', 'init', 'status', 'protected', 'commit-msg'])
 
 export function parseArgs(args: string[]): CliCommand {
   const [command, ...rest] = args

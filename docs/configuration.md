@@ -164,6 +164,22 @@ Once `languages` lists anything, only the listed languages run: add `typescript:
 
 A language with no registered adapter is an error, not a skipped language. So is a language with mutation enabled whose adapter has no mutation engine.
 
+## Hooks
+
+```typescript
+hooks: {
+  preCommit: true,   // the local two-phase and protected-test guard
+  commitMsg: false,  // tag commits [vibecheck:phase1] or [vibecheck:phase2]
+},
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `preCommit` | `boolean` | `true` | When false, `vibecheck check --hook` exits 0 without enforcing |
+| `commitMsg` | `boolean` | `false` | When true, the commit-msg hook appends a phase tag. Tests only are `phase1`. Implementation only is `phase2`. A mix, or a commit with neither, is not tagged |
+
+`vibecheck init` installs both hook files. The commit-msg hook does nothing until `commitMsg` is true, so installing it is safe. See [Pre-commit Hook](pre-commit.md).
+
 ## Protected Tests
 
 Some tests enforce a repo-wide rule (a test that scans the codebase for raw error strings, say), and some conventions every test of a kind must follow (every widget test covers a narrow and a wide viewport). Weakening those is worse than weakening an ordinary test, so they get their own gate.

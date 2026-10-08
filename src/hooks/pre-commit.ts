@@ -59,6 +59,8 @@ function identityLine(identity: AgentIdentity, signal: string | null, level: str
  * warn prints and allows it, off skips. CI is still the enforcement boundary.
  */
 export async function runPreCommit(config: Config, input: HookInput): Promise<HookResult> {
+  if (!config.hooks.preCommit) return { exitCode: 0, message: '' }
+
   const { identity, matchedSignal } = detectAgent({
     commitMessage: input.commitMessage,
     trailers: config.agentTrailers,

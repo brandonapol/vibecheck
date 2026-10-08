@@ -19,6 +19,7 @@ export type InitResult = {
   gitlabCiCreated: boolean
   claudeSnippet: string
   hook: HookInstall
+  commitMsgHook: HookInstall
   claudeHook: ClaudeHookInstall
 }
 
@@ -40,6 +41,7 @@ const INLINE_CLAUDE_SETTINGS = `{
 `
 
 const HOOK_LINE = 'npx --no-install vibecheck check --hook'
+const COMMIT_MSG_LINE = 'npx --no-install vibecheck commit-msg --file "$1"'
 
 const CONFIG_TEMPLATE = `import { defineConfig } from 'vibecheck-tdd'
 
@@ -72,6 +74,7 @@ export async function scaffoldProject(cwd: string): Promise<InitResult> {
     gitlabCiCreated: false,
     claudeSnippet: '',
     hook: { path: '.git/hooks/pre-commit', action: 'skipped' },
+    commitMsgHook: { path: '.git/hooks/commit-msg', action: 'skipped' },
     claudeHook: { action: 'skipped' },
   }
 
@@ -110,6 +113,7 @@ export async function scaffoldProject(cwd: string): Promise<InitResult> {
     : getInlineClaudeSnippet()
   result.gitlabCiCreated = installGitlabCi(cwd)
   result.hook = installHook(cwd)
+  result.commitMsgHook = installCommitMsgHook(cwd)
   result.claudeHook = installClaudeHook(cwd)
 
   return result
@@ -157,31 +161,40 @@ function packageHasHusky(cwd: string): boolean {
   }
 }
 
-function writeHook(file: string, display: string): HookInstall {
+function writeHook(file: string, display: string, line: string, marker: string): HookInstall {
   if (!existsSync(file)) {
-    writeFileSync(file, `#!/bin/sh\n${HOOK_LINE}\n`)
+    writeFileSync(file, `#!/bin/sh\n${line}\n`)
     chmodSync(file, 0o755)
     return { path: display, action: 'created' }
   }
   const text = readFileSync(file, 'utf-8')
-  if (text.includes('vibecheck check --hook')) return { path: display, action: 'unchanged' }
-  writeFileSync(file, text.endsWith('\n') ? `${text}${HOOK_LINE}\n` : `${text}\n${HOOK_LINE}\n`)
+  if (text.includes(marker)) return { path: display, action: 'unchanged' }
+  writeFileSync(file, text.endsWith('\n') ? `${text}${line}\n` : `${text}\n${line}\n`)
   return { path: display, action: 'appended' }
+}
+
+function installNamedHook(cwd: string, name: string, line: string, marker: string): HookInstall {
+  if (existsSync(join(cwd, '.husky')) || packageHasHusky(cwd)) {
+    const dir = join(cwd, '.husky')
+    mkdirSync(dir, { recursive: true })
+    return writeHook(join(dir, name), `.husky/${name}`, line, marker)
+  }
+  if (!existsSync(join(cwd, '.git'))) {
+    return { path: `.git/hooks/${name}`, action: 'skipped' }
+  }
+  const dir = join(cwd, '.git', 'hooks')
+  mkdirSync(dir, { recursive: true })
+  return writeHook(join(dir, name), `.git/hooks/${name}`, line, marker)
 }
 
 /** Husky when the project uses it; otherwise `.git/hooks`. Never replaces an existing hook. */
 export function installHook(cwd: string): HookInstall {
-  if (existsSync(join(cwd, '.husky')) || packageHasHusky(cwd)) {
-    const dir = join(cwd, '.husky')
-    mkdirSync(dir, { recursive: true })
-    return writeHook(join(dir, 'pre-commit'), '.husky/pre-commit')
-  }
-  if (!existsSync(join(cwd, '.git'))) {
-    return { path: '.git/hooks/pre-commit', action: 'skipped' }
-  }
-  const dir = join(cwd, '.git', 'hooks')
-  mkdirSync(dir, { recursive: true })
-  return writeHook(join(dir, 'pre-commit'), '.git/hooks/pre-commit')
+  return installNamedHook(cwd, 'pre-commit', HOOK_LINE, 'vibecheck check --hook')
+}
+
+/** Installed beside the pre-commit hook. Tagging stays off until `hooks.commitMsg` is true. */
+export function installCommitMsgHook(cwd: string): HookInstall {
+  return installNamedHook(cwd, 'commit-msg', COMMIT_MSG_LINE, 'vibecheck commit-msg')
 }
 
 function ensureGitignore(cwd: string): void {

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Opt-in. Does nothing unless hooks.commitMsg is true in vibecheck config.
+# --no-install: never fetch a package while a commit message is being recorded.
+npx --no-install vibecheck commit-msg --file "$1"
