@@ -46,7 +46,6 @@ describe('scaffoldProject GitLab CI', () => {
 
   it('does not overwrite .gitlab/vibecheck.yml', async () => {
     writeFileSync(join(tmpDir, '.gitlab-ci.yml'), 'stages: [test]\n')
-    const { mkdirSync } = await import('node:fs')
     mkdirSync(join(tmpDir, '.gitlab'))
     writeFileSync(join(tmpDir, '.gitlab', 'vibecheck.yml'), 'existing')
     const result = await scaffoldProject(tmpDir)
