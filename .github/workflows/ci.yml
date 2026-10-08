@@ -67,3 +67,22 @@ jobs:
       - run: npm run build
       - name: Run vibecheck
         run: node dist/bin/vibecheck.js check --semantic --base origin/${{ github.base_ref || 'main' }}
+
+  # Open-source ShiftLeft scan. The action passes --no-error, so findings
+  # are reported and do not fail this job. It stays off the Dogfood job
+  # because the image is large.
+  shiftleft:
+    name: ShiftLeft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShiftLeft scan
+        uses: ShiftLeftSecurity/scan-action@v1.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          type: nodejs,go,credscan,depscan
