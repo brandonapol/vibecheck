@@ -179,7 +179,7 @@ describe('runMutationTest', () => {
       input = await readFile(list[list.length - 1], 'utf8')
       const out = list[list.indexOf('-o') + 1]
       await import('node:fs/promises').then(fs =>
-        fs.writeFile(join(out, 'mutation-test-report.xunit.xml'), REPORT),
+        fs.writeFile(join(out, 'mutation-test.xunit.xml'), REPORT),
       )
       return { exitCode: 0 } as never
     })
@@ -206,7 +206,7 @@ describe('runMutationTest', () => {
       const out = list[list.indexOf('-o') + 1]
       await import('node:fs/promises').then(fs =>
         fs.writeFile(
-          join(out, 'mutation-test-report.xunit.xml'),
+          join(out, 'mutation-test.xunit.xml'),
           '<testsuites><testsuite name="add"><testcase name="Line1_add_0" classname="lib/add.dart"/></testsuite></testsuites>',
         ),
       )
@@ -238,7 +238,7 @@ describe('runMutationTest', () => {
       const out = list[list.indexOf('-o') + 1]
       await import('node:fs/promises').then(fs =>
         fs.writeFile(
-          join(out, 'mutation-test-report.xunit.xml'),
+          join(out, 'mutation-test.xunit.xml'),
           '<testsuites><testsuite name="add"><testcase name="Line1_add_0" classname="lib/weak.dart"><failure type="undetected" message="lived">Line: 1\nMutation: return n - 1;</failure></testcase></testsuite></testsuites>',
         ),
       )

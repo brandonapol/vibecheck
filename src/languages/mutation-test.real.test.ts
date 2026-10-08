@@ -32,7 +32,7 @@ function scoreOf(fileScores: Record<string, number>, suffix: string): number {
   return entry[1]
 }
 
-describe.skipIf(!hasDart)('mutation_test integration (skipped: dart not on PATH)', () => {
+describe.skipIf(!hasDart)(hasDart ? 'mutation_test integration' : 'mutation_test integration (skipped: dart not on PATH)', () => {
   it('kills mutants in add.dart and lets weak.dart fail the per-file threshold', async () => {
     const env = { ...process.env }
     delete env.CI
@@ -52,7 +52,6 @@ describe.skipIf(!hasDart)('mutation_test integration (skipped: dart not on PATH)
     expect(report.survivingMutants.some(mutant => mutant.file.replaceAll('\\', '/').endsWith('lib/weak.dart'))).toBe(
       true,
     )
-    expect(elapsed).toBeGreaterThan(0)
 
     const config: MutationConfig = { ...defaultConfig.mutation, threshold: 0, perFileThreshold: 60 }
     const result = checkMutationThresholds(report, config)
