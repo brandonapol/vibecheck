@@ -15,6 +15,8 @@ export type InitResult = {
   configCreated: boolean
   hiddenDirCreated: boolean
   ciCreated: boolean
+  /** True when `.gitlab/vibecheck.yml` was copied. `.gitlab-ci.yml` is never rewritten. */
+  gitlabCiCreated: boolean
   claudeSnippet: string
   hook: HookInstall
   claudeHook: ClaudeHookInstall
@@ -67,6 +69,7 @@ export async function scaffoldProject(cwd: string): Promise<InitResult> {
     configCreated: false,
     hiddenDirCreated: false,
     ciCreated: false,
+    gitlabCiCreated: false,
     claudeSnippet: '',
     hook: { path: '.git/hooks/pre-commit', action: 'skipped' },
     claudeHook: { action: 'skipped' },
@@ -105,6 +108,7 @@ export async function scaffoldProject(cwd: string): Promise<InitResult> {
   result.claudeSnippet = existsSync(claudePath)
     ? readFileSync(claudePath, 'utf-8')
     : getInlineClaudeSnippet()
+  result.gitlabCiCreated = installGitlabCi(cwd)
   result.hook = installHook(cwd)
   result.claudeHook = installClaudeHook(cwd)
 
@@ -189,6 +193,33 @@ function ensureGitignore(cwd: string): void {
   if (missing.length === 0) return
   const body = existing.length === 0 || existing.endsWith('\n') ? existing : `${existing}\n`
   writeFileSync(path, `${body}${missing.join('\n')}\n`)
+}
+
+/** Copy the include template when this is already a GitLab project. Never edit `.gitlab-ci.yml`. */
+export function installGitlabCi(cwd: string): boolean {
+  if (!existsSync(join(cwd, '.gitlab-ci.yml'))) return false
+  const dest = join(cwd, '.gitlab', 'vibecheck.yml')
+  if (existsSync(dest)) return false
+  mkdirSync(join(cwd, '.gitlab'), { recursive: true })
+  const templatePath = join(getTemplatesDir(), 'gitlab-ci.yml')
+  if (existsSync(templatePath)) copyFileSync(templatePath, dest)
+  else writeFileSync(dest, getInlineGitlabTemplate())
+  return true
+}
+
+function getInlineGitlabTemplate(): string {
+  return `.vibecheck:
+  stage: test
+  image: node:20
+  variables:
+    GIT_DEPTH: "0"
+    VIBECHECK_THRESHOLD: "80"
+  script:
+    - npx vibecheck check --threshold "$VIBECHECK_THRESHOLD" --base "origin/\${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-main}"
+
+vibecheck:
+  extends: .vibecheck
+`
 }
 
 function getInlineWorkflowTemplate(): string {

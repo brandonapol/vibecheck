@@ -67,6 +67,39 @@ jobs:
 |--------|----------|-------------|
 | `hidden-tests-deploy-key` | No | SSH private key for `hiddenTests.source: 'repo'`. The workflow writes it to `VIBECHECK_HIDDEN_TESTS_KEY` when the secret is non-empty. |
 
+## GitLab CI
+
+`templates/gitlab-ci.yml` is the GitLab equivalent of the GitHub Actions workflow. It is an include, not a copy of your whole pipeline. `vibecheck init` copies it to `.gitlab/vibecheck.yml` when `.gitlab-ci.yml` already exists, and does not rewrite that file.
+
+```yaml
+include:
+  - local: .gitlab/vibecheck.yml
+```
+
+To include the copy that ships with vibecheck:
+
+```yaml
+include:
+  - remote: https://raw.githubusercontent.com/brandonapol/vibecheck/main/templates/gitlab-ci.yml
+
+vibecheck:
+  extends: .vibecheck
+  variables:
+    VIBECHECK_THRESHOLD: "90"
+```
+
+The job clones with `GIT_DEPTH: "0"`, fetches the merge request's target branch, and runs:
+
+```bash
+npx vibecheck check --threshold "$VIBECHECK_THRESHOLD" --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+```
+
+On a branch pipeline that is not a merge request, the base is `origin/$CI_DEFAULT_BRANCH`.
+
+For `hiddenTests.source: 'repo'`, define `VIBECHECK_HIDDEN_TESTS_KEY` as a [file variable](https://docs.gitlab.com/ci/variables/#use-file-type-cicd-variables). vibecheck reads that variable itself. The template does not print the key.
+
+The same limits as GitHub apply: a merge request can edit `.gitlab-ci.yml` and drop the include. Protect that file with CODEOWNERS, and require the `vibecheck` job to pass before merge.
+
 ### Branch Protection
 
 ## Config Comes From the Base Branch

@@ -1,0 +1,50 @@
+# GitLab CI include for vibecheck.
+#
+# From a project that already has .gitlab-ci.yml (this is what `vibecheck init` copies):
+#
+#   include:
+#     - local: .gitlab/vibecheck.yml
+#
+# From this repository:
+#
+#   include:
+#     - remote: https://raw.githubusercontent.com/brandonapol/vibecheck/main/templates/gitlab-ci.yml
+#
+# Raise the score floor without copying the job:
+#
+#   vibecheck:
+#     extends: .vibecheck
+#     variables:
+#       VIBECHECK_THRESHOLD: "90"
+#
+# Hidden tests that clone a private repo read VIBECHECK_HIDDEN_TESTS_KEY.
+# Define it as a GitLab file variable pointing at the deploy key.
+
+.vibecheck:
+  stage: test
+  image: node:20
+  variables:
+    GIT_DEPTH: "0"
+    VIBECHECK_THRESHOLD: "80"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - |
+      if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
+        git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+      else
+        git fetch origin "${CI_DEFAULT_BRANCH:-main}"
+      fi
+    - npm ci
+  script:
+    - |
+      if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
+        BASE="origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+      else
+        BASE="origin/${CI_DEFAULT_BRANCH:-main}"
+      fi
+      npx vibecheck check --threshold "$VIBECHECK_THRESHOLD" --base "$BASE"
+
+vibecheck:
+  extends: .vibecheck
