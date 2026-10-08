@@ -26,7 +26,7 @@ npm install --save-dev @stryker-mutator/core @stryker-mutator/vitest-runner
 
 If the binary is missing, `vibecheck check --mutation` fails. It does not report a score of 100.
 
-`src/analyzers/mutation.real.test.ts` runs that binary against `test/fixtures/stryker`. The test is skipped when `node_modules/.bin/stryker` is not installed there. CI installs the fixture's own dev dependencies, which are not dependencies of vibecheck. A `npx` earlier on `PATH` exits 97, so a runner that shells out to `npx stryker` fails the test.
+`src/analyzers/mutation.real.test.ts` runs that binary against `test/fixtures/stryker`. The test is skipped when `node_modules/.bin/stryker` is not installed there, and when the installed binary refuses to start (Stryker 10 requires Node.js 22 or newer). CI installs the fixture on Node 22 only. Those dev dependencies are not dependencies of vibecheck. A `npx` earlier on `PATH` exits 97, so a runner that shells out to `npx stryker` fails the test.
 
 The JSON report is read from `jsonReporter.fileName` in `stryker.config.json` (or `stryker.conf.json`). When that file does not set one, vibecheck reads Stryker's default, `reports/mutation/mutation.json`. A JavaScript config's custom path is not evaluated.
 

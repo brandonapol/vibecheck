@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { constants } from 'node:fs'
 import { accessSync, chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -21,6 +22,17 @@ function hasStryker(): boolean {
   }
 }
 
+/** Stryker 10 refuses to start below Node 22. A binary that cannot run is skipped, not failed. */
+function strykerRuns(): boolean {
+  if (!hasStryker()) return false
+  try {
+    execFileSync(strykerBin, ['--version'], { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
 describe('stryker is not a vibecheck dependency', () => {
   it('keeps @stryker-mutator out of package.json', () => {
     const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf-8')) as {
@@ -37,8 +49,12 @@ describe('stryker is not a vibecheck dependency', () => {
   })
 })
 
-describe.skipIf(!hasStryker())(
-  hasStryker() ? 'stryker local binary' : 'stryker local binary (skipped: fixture binary is not installed)',
+const strykerReady = strykerRuns()
+
+describe.skipIf(!strykerReady)(
+  strykerReady
+    ? 'stryker local binary'
+    : 'stryker local binary (skipped: binary missing, or this Node is too old to start it)',
   () => {
     let poison: string | undefined
     const originalPath = process.env.PATH
