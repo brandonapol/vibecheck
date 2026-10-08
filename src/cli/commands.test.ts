@@ -32,6 +32,10 @@ describe('parseArgs', () => {
     expect(result).toEqual({ command: 'report', flags: {} })
   })
 
+  it('parses status command', () => {
+    expect(parseArgs(['status'])).toEqual({ command: 'status', flags: {} })
+  })
+
   it('parses init command', () => {
     const result = parseArgs(['init'])
     expect(result).toEqual({ command: 'init', flags: {} })
