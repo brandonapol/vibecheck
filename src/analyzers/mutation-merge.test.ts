@@ -19,6 +19,32 @@ describe('extractScores counts', () => {
     expect(report.killed).toBe(2)
     expect(report.total).toBe(3)
   })
+
+  it('counts timeout as killed and uncovered against the score, ignoring compile errors', () => {
+    const report = extractScores({
+      files: {
+        'src/a.ts': {
+          mutants: [
+            mutant('Killed', 1),
+            mutant('Timeout', 2),
+            mutant('NoCoverage', 3),
+            mutant('CompileError', 4),
+            mutant('Ignored', 5),
+          ],
+        },
+      },
+    })
+    expect(report.killed).toBe(2)
+    expect(report.total).toBe(3)
+    expect(report.overallScore).toBeCloseTo(66.67, 1)
+    expect(report.survivingMutants.map(item => item.location.line)).toEqual([3])
+  })
+
+  it('refuses to score a pending mutant as a kill', () => {
+    expect(() => extractScores({
+      files: { 'src/a.ts': { mutants: [mutant('Pending', 1)] } },
+    })).toThrow(/Pending/)
+  })
 })
 
 describe('mergeMutationReports', () => {
@@ -52,6 +78,11 @@ describe('mergeMutationReports', () => {
 
   it('returns a single report unchanged in substance', () => {
     expect(mergeMutationReports([a])).toEqual(a)
+  })
+
+  it('marks the merge diff-scoped only when an input was', () => {
+    expect(mergeMutationReports([{ ...a, diffScoped: true }, b]).diffScoped).toBe(true)
+    expect(mergeMutationReports([a, b]).diffScoped).toBeUndefined()
   })
 
   it('scores an empty merge like a run with no mutants', () => {

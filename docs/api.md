@@ -163,7 +163,7 @@ Run each enabled language's mutation engine and merge the results with `mergeMut
 
 ### `extractScores(strykerOutput)`
 
-Parse Stryker JSON output into per-file mutation scores, plus the `killed` and `total` mutant counts.
+Parse Stryker JSON output into per-file mutation scores, plus the `killed` and `total` mutant counts. The score is killed / (killed + survived + uncovered). Mutants that did not compile, or were not run, are excluded. A pending or unknown status throws.
 
 ### `mergeMutationReports(reports)`
 

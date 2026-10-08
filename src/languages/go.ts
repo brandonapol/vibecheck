@@ -2,6 +2,7 @@ import { execa } from 'execa'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHelperExtractor, type HelperSpec } from './helper.js'
+import { runGremlinsMutation } from './gremlins.js'
 import type { LanguageAdapter } from './types.js'
 
 /** Matchers the Go helper emits. Lowercase names describe a guarded
@@ -101,9 +102,10 @@ export function createGoAdapter({
     extractTests: async (source, path) => (await extract(source, path)).tests,
     extractSetup: async (source, path) => (await extract(source, path)).setup,
     assertionStrength: matcher => GO_ASSERTION_STRENGTH[matcher] ?? UNKNOWN_MATCHER_STRENGTH,
+    runMutation: options => runGremlinsMutation(options),
   }
 }
 
 /** Go tests parsed by a helper built from helpers/go-testast with the local
- *  Go toolchain. No mutation engine yet (#79). */
+ *  Go toolchain. Mutation testing runs gremlins, which must be on PATH. */
 export const goAdapter = createGoAdapter()

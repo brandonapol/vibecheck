@@ -19,7 +19,7 @@ vibecheck layers four complementary checks into a composite integrity score (0-1
 
 | Analyzer | What it catches | Weight |
 |----------|----------------|--------|
-| **Mutation testing** (Stryker) | Weak assertions that survive code mutations | 40% |
+| **Mutation testing** (Stryker, gremlins for Go) | Weak assertions that survive code mutations | 40% |
 | **Hidden test suites** | Tests fitted to implementation instead of spec | 30% |
 | **Property-based tests** | Hardcoded return values | 20% |
 | **Semantic diff analysis** | Retroactive assertion weakening | 10% |

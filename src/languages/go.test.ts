@@ -60,8 +60,8 @@ describe('goAdapter', () => {
     expect(goAdapter.assertionStrength('checkSum')).toBe(5)
   })
 
-  it('has no mutation engine yet', () => {
-    expect(goAdapter.runMutation).toBeUndefined()
+  it('runs mutation testing with gremlins', () => {
+    expect(goAdapter.runMutation).toBeTypeOf('function')
   })
 })
 
